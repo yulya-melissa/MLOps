@@ -1,0 +1,69 @@
+[project]
+name = "forest-fire-detection"
+version = "0.1.0"
+description = "MLOps lab1"
+readme = "README.md"
+authors = [
+    { name = "Yuliya Kapustina", email = "yulya.melissa@gmail.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0.52",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[project.scripts]
+forest-fire-detection = "forest_fire_detection:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "asgi-lifespan>=2.1.0",
+    "httpx>=0.28.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # Pyflakes
+    "I",     # isort
+    "UP",    # pyupgrade
+    "N",     # pep8-naming
+    "B",     # flake8-bugbear
+    "ASYNC", # flake8-async (обязательно для FastAPI!)
+    "RUF",   # ruff-specific
+]
+ignore = [
+    "RUF001", # кириллица в строках
+    "RUF002", # кириллица в docstring
+    "RUF003", # кириллица в комментариях
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ruff.format]
+quote-style = "double"
