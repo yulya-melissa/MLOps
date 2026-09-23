@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fire_detection_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: fire_detection
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fire_detection"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fire_detection_app
+    ports:
+      - "8000:8000"
+    environment:
+      FIRE_POSTGRES_HOST: postgres
+      FIRE_POSTGRES_PORT: 5432
+      FIRE_POSTGRES_USER: postgres
+      FIRE_POSTGRES_PASSWORD: postgres_password
+      FIRE_POSTGRES_DB: fire_detection
+      FIRE_LOG_LEVEL: INFO
+      FIRE_ENVIRONMENT: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pg_data:

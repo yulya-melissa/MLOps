@@ -1,26 +1,29 @@
 [project]
-name = "forest-fire-detection"
+name = "fire-detection"
 version = "0.1.0"
-description = "MLOps lab1"
+description = "Fire detection service (MLOps lab)"
 readme = "README.md"
-authors = [
-    { name = "Yuliya Kapustina", email = "yulya.melissa@gmail.com" }
-]
 requires-python = ">=3.12,<3.13"
+authors = [
+    { name = "Yuliya Kapustina", email = "yulya.melissa@gmail.com" },
+]
 dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.141.1",
     "pydantic-settings>=2.15.0",
-    "sqlalchemy>=2.0.52",
     "uvicorn[standard]>=0.53.0",
 ]
 
 [project.scripts]
-forest-fire-detection = "forest_fire_detection:main"
+fire-detection = "src.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.12.13,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "."
+module-name = "src"
 
 [dependency-groups]
 dev = [
@@ -29,17 +32,34 @@ dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.7",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -52,15 +72,16 @@ select = [
     "B",     # flake8-bugbear
     "ASYNC", # flake8-async (обязательно для FastAPI!)
     "RUF",   # ruff-specific
+    "ANN",
 ]
 ignore = [
-    "RUF001", # кириллица в строках
-    "RUF002", # кириллица в docstring
-    "RUF003", # кириллица в комментариях
+    "RUF001",
+    "RUF002",
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN"]
+"tests/**" = ["ANN", "S101"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

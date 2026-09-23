@@ -1,0 +1,29 @@
+"""Потом переделать в нормальную readme"""
+
+Для запуска тестов с покрытием:
+uv run pytest --cov=src --cov-report=term-missing
+
+uv sync — поставить зависимости.
+
+uv run uvicorn src.app:app --reload — запустить.
+
+uv run pytest — тесты.
+
+uv run ruff check . — линт.
+
+
+Докер
+systemctl --user start podman.socket
+systemctl --user enable podman.socket
+#это так если докер через подман
+
+docker compose build
+#собрать докер
+
+docker compose up -d  # запустить
+
+docker compose ps  # проверить статус
+
+docker compose down          # остановить, данные Postgres сохранятся
+docker compose down -v       # остановить и удалить volume (данные БД тоже)
+podman-compose down -v    # если не убилось что-то в подмане должно помочь
