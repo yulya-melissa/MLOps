@@ -39,12 +39,16 @@ jobs:
 
       # 3. ????????? ?????????? ?????? ? ?????????? GitHub Actions
       - name: Generate Coverage Summary
-        if: success() || failure()
+        if: always()
         run: |
-          echo "Code Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          pytest --cov=src --cov-report=term-missing tests/ | grep -E "(TOTAL|Name|src/)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "### Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" = "success" ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            pytest --cov=src --cov-report=term-missing tests/ | grep -E "(TOTAL|Name|src/)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "?? **Fail -> no coverage**" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload Coverage Artifact
         uses: actions/upload-artifact@v4
