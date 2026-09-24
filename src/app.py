@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.settings = settings
     app.state.db_pool = await db.create_db_pool(settings)
     log.info(
-        "Приложение %s v%s запущено (env=%s, debug=%s)",
+        "Сервис %s версии %s успешно стартовал! (env=%s, debug=%s)",
         settings.app_name,
         settings.version,
         settings.environment,
