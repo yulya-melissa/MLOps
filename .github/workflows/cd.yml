@@ -1,0 +1,98 @@
+name: CD
+
+# Триггер: реагируем на завершение workflow "CI" (см. .github/workflows/ci.yml),
+# а не на push напрямую. Так гарантированно билдим и публикуем образ ТОЛЬКО
+# после того, как линтер, форматтер и тесты реально прошли — а не "одновременно" с CI.
+#
+# ВАЖНО: строка "workflows: [\"CI\"]" ниже должна ДОСЛОВНО совпадать
+# со значением `name:` в вашем ci.yml (проверьте это в первую очередь!).
+on:
+  workflow_run:
+    workflows: ["CI - Lint, Format, Tests"]
+    types: [completed]
+    branches: [main]
+
+# GITHUB_TOKEN по умолчанию имеет права только на чтение. Явно расширяем
+# до "запись" для пакетов (загрузка образа в GHCR) — и не выдаём больше,
+# чем нужно (contents по-прежнему только read).
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    # Публикуем образ, только если:
+    #  1) CI закончился успешно (conclusion == 'success')
+    #  2) CI был запущен именно пушем, а не pull_request
+    #     (у CI есть триггер на PR — из веток PR образы публиковать не нужно)
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+
+    steps:
+      # Важный нюанс workflow_run: по умолчанию actions/checkout возьмёт
+      # HEAD ветки main НА МОМЕНТ ЗАПУСКА CD, а не тот коммит, который
+      # проверял CI. Явно фиксируем нужный коммит через head_sha.
+      - name: Checkout commit that CI just verified
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Python (только чтобы прочитать pyproject.toml)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Тег образа = версия из pyproject.toml, а НЕ github.sha.
+      # Именно эту версию приложение реально отдаёт на /api/v1/version
+      # (importlib.metadata.version("fire-detection")), поэтому тег в реестре
+      # и ответ работающего сервиса обязаны совпадать.
+      - name: Read app version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "Detected app version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Short commit SHA (для отладочного тега)
+        id: short_sha
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "short=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      # GHCR требует, чтобы имя владельца/образа было в нижнем регистре.
+      - name: Build lowercase image name
+        id: image
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${OWNER}/fire-detection" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}
+            ${{ steps.image.outputs.name }}:sha-${{ steps.short_sha.outputs.short }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Write summary
+        run: |
+          {
+            echo "### Образ опубликован в GHCR"
+            echo "- Версия: \`${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}\`"
+            echo "- Debug-тег: \`${{ steps.image.outputs.name }}:sha-${{ steps.short_sha.outputs.short }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
