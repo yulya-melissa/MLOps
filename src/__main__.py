@@ -5,7 +5,7 @@ import uvicorn
 from src.config import get_settings
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     """Запуѝтить приложение через uvicorn ѝ наѝтройками из окружениѝ."""
     settings = get_settings()
     uvicorn.run(
