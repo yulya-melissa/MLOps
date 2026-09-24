@@ -1,6 +1,6 @@
 [project]
 name = "fire-detection"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fire detection service (MLOps lab)"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"

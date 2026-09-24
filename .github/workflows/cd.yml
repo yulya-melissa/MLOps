@@ -8,7 +8,7 @@ name: CD
 # со значением `name:` в вашем ci.yml (проверьте это в первую очередь!).
 on:
   workflow_run:
-    workflows: ["CI - Lint, Format, Tests"]
+    workflows: ["CI Pipeline"]
     types: [completed]
     branches: [main]
 

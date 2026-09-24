@@ -6,7 +6,7 @@ from src.config import get_settings
 
 
 def main() -> None:
-    """Запуѝтить приложение через uvicorn ѝ наѝтройками из окружениѝ."""
+    """Запустить приложение через uvicorn с настройками из окружениѝ."""
     settings = get_settings()
     uvicorn.run(
         "src.app:app",

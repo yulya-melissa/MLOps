@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "fire-detection"
-    version: str = "0.1.0"
+    version: str = "0.1.1"  # keep in sync with pyproject.toml for fallback
     environment: Literal["development", "staging", "production", "test"] = "development"
     debug: bool = False
     log_level: str = "INFO"
