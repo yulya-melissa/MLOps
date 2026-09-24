@@ -39,9 +39,9 @@ jobs:
 
       # 3. ????????? ?????????? ?????? ? ?????????? GitHub Actions
       - name: Generate Coverage Summary
-        if: always()
+        if: success() || failure()
         run: |
-          echo "### Code Coverage Report ??" >> $GITHUB_STEP_SUMMARY
+          echo "Code Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           pytest --cov=src --cov-report=term-missing tests/ | grep -E "(TOTAL|Name|src/)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
