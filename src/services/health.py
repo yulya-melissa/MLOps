@@ -21,10 +21,8 @@ async def check_postgres(pool: asyncpg.Pool) -> DependencyHealth:
     start = time.perf_counter()
     try:
         async with pool.acquire(timeout=2.0) as conn:
-            row = await conn.fetchrow(
-                "SELECT current_setting('server_version') AS server_version"
-            )
-    except Exception as exc:  # noqa: BLE001
+            row = await conn.fetchrow("SELECT current_setting('server_version') AS server_version")
+    except Exception as exc:
         latency_ms = round((time.perf_counter() - start) * 1000, 2)
         log.warning("Ошибка проверки здоровья Postgres: %s", exc)
         return DependencyHealth(
@@ -46,9 +44,7 @@ async def build_report(pool: asyncpg.Pool, settings: Settings) -> HealthReport:
     pg_health = await check_postgres(pool)
 
     overall_status = (
-        ReportStatus.ok
-        if pg_health.status == HealthStatus.healthy
-        else ReportStatus.degraded
+        ReportStatus.ok if pg_health.status == HealthStatus.healthy else ReportStatus.degraded
     )
 
     return HealthReport(

@@ -4,13 +4,9 @@ import contextvars
 import logging
 import sys
 
-REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "request_id", default=None
-)
+REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
 
-_FORMAT = (
-    "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(request_id)-8s | %(name)s | %(message)s"
-)
+_FORMAT = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(request_id)-8s | %(name)s | %(message)s"
 _DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 

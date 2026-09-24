@@ -1,4 +1,4 @@
-"""Тесты health-эндпоинтов (интеграционные, требуют реальной инфраструктуры)."""
+"""Теѝты health-ѝндпоинтов (интеграционные, требуют реальной инфраѝтруктуры)."""
 
 import socket
 
@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 
 def postgres_available() -> bool:
-    """Проверить, доступен ли Postgres на localhost:5432."""
+    """Проверить, доѝтупен ли Postgres на localhost:5432."""
     try:
         with socket.create_connection(("localhost", 5432), timeout=1):
             return True
@@ -24,10 +24,10 @@ async def test_liveness_endpoint(client: AsyncClient) -> None:
 
 @pytest.mark.skipif(
     not postgres_available(),
-    reason="Postgres недоступен на localhost:5432 — запусти `docker compose up -d postgres`",
+    reason="Postgres недоѝтупен на localhost:5432 — запуѝти `docker compose up -d postgres`",
 )
 async def test_health_endpoint_ok(client: AsyncClient) -> None:
-    """End-to-end проверка /api/v1/health при доступной БД."""
+    """End-to-end проверка /api/v1/health при доѝтупной БД."""
     response = await client.get("/api/v1/health")
 
     assert response.status_code == 200
@@ -42,7 +42,7 @@ async def test_health_endpoint_ok(client: AsyncClient) -> None:
 
 
 async def test_health_endpoint_shape(client: AsyncClient) -> None:
-    """Проверка формы ответа /api/v1/health независимо от доступности БД."""
+    """Проверка формы ответа /api/v1/health незавиѝимо от доѝтупноѝти БД."""
     response = await client.get("/api/v1/health")
     assert response.status_code in (200, 503)
 
@@ -56,4 +56,4 @@ async def test_health_endpoint_shape(client: AsyncClient) -> None:
     assert "status" in pg
     assert pg["status"] in ("healthy", "unavailable")
     assert "latency_ms" in pg
-    assert isinstance(pg["latency_ms"], (int, float))
+    assert isinstance(pg["latency_ms"], int | float)
