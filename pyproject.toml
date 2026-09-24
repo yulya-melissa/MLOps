@@ -46,6 +46,9 @@ addopts = "-ra --strict-markers"
 [tool.coverage.run]
 source = ["src"]
 branch = true
+omit = [
+    "src/__main__.py",
+]
 
 [tool.coverage.report]
 show_missing = true
