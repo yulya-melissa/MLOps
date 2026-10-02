@@ -16,3 +16,10 @@ logs/
 !.vscode/settings.json
 !.vscode/launch.json
 !.vscode/extensions.json
+combain.py
+all_text.txt
+data
+*.zip
+*.png
+*.jpg
+reports

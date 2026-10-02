@@ -29,11 +29,22 @@ module-name = "src"
 dev = [
     "asgi-lifespan>=2.1.0",
     "httpx>=0.28.1",
+    "ipykernel>=7.4.0",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.7",
+]
+eda = [
+    "boto3>=1.43.104",
+    "kagglehub>=1.0.2",
+    "matplotlib>=3.11.2",
+    "mlflow>=2.13.0,<3",
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "pyarrow>=17.0.0",
+    "seaborn>=0.13.2",
 ]
 
 [tool.pytest.ini_options]
@@ -62,7 +73,7 @@ exclude_lines = [
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -73,7 +84,7 @@ select = [
     "UP",    # pyupgrade
     "N",     # pep8-naming
     "B",     # flake8-bugbear
-    "ASYNC", # flake8-async (обѝзательно длѝ FastAPI!)
+    "ASYNC", # flake8-async
     "RUF",   # ruff-specific
     "ANN",
 ]
@@ -86,6 +97,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN", "S101"]
+"scripts/**" = ["ANN", "T201"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

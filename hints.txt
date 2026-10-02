@@ -22,8 +22,22 @@ docker compose build
 
 docker compose up -d  # запустить
 
+# Пересобираем и перезапускаем контейнеры
+docker compose up -d --build
+
 docker compose ps  # проверить статус
 
 docker compose down          # остановить, данные Postgres сохранятся
 docker compose down -v       # остановить и удалить volume (данные БД тоже)
 podman-compose down -v    # если не убилось что-то в подмане должно помочь
+
+
+
+Скрипты для запуска MLflow
+uv run --group eda python scripts/eda.py
+
+Для того чтобы у вас датасет работал:
+скачайте зип файл с сайта roboflow yolo8
+измените конфиг.ямл чтобы он скачал весь файл а не часть
+запуститите скрипт scripts/download_dataset и он распакует его
+но учтите что датасет занимает достаточно места cv все таки

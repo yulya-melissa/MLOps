@@ -1,0 +1,12 @@
+dataset:
+  kaggle_name: "backpacker/fasdd-flame-and-smoke-detection-dataset"
+  raw_dir: "data/fasdd"
+  summary_csv: "data/fasdd_parsed_summary.csv"
+  # Настройки режима сэмплирования
+  sample_mode: true     # true = брать только часть данных, false = качать/копировать всё
+  sample_limit: 500      # Количество файлов для сэмпла (если sample_mode: true)
+
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "FASDD_Dataset_Management_2"
+  run_name: "dataset_eda_and_registration"
