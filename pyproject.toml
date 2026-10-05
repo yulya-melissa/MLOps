@@ -45,6 +45,13 @@ eda = [
     "pandas>=2.2.0",
     "pyarrow>=17.0.0",
     "seaborn>=0.13.2",
+    "ultralytics>=8.4.173",
+]
+train = [
+    "mlflow>=2.22.5",
+    "pandas>=2.3.3",
+    "pyyaml>=6.0.3",
+    "ultralytics>=8.4.173",
 ]
 
 [tool.pytest.ini_options]

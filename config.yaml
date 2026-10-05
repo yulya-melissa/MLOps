@@ -10,3 +10,13 @@ mlflow:
   tracking_uri: "http://localhost:5000"
   experiment_name: "FASDD_Dataset_Management_2"
   run_name: "dataset_eda_and_registration"
+
+train:
+  experiment_name: "fire_detection_dev"
+  data_dir: "data/roboflow_test"
+  epochs: 5
+  batch: 8
+  fraction: 0.3
+  seed: 42
+  registered_model_name: "fire-detector"
+  dataset_name: "fire-detection-roboflow-v4"      # надо поменять, я брала урезанный датасет с roboflow, а не целый с kaggle
