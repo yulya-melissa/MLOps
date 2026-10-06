@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 import mlflow
 import mlflow.data
 import pandas as pd
+import torch
 import ultralytics
 import yaml
 from ultralytics import YOLO
@@ -25,28 +27,19 @@ except Exception:
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 
-# Диагностические файлы, которые Ultralytics кладёт в папку обучения.
-DIAGNOSTICS = [
-    "results.png",
-    "results.csv",
-    "confusion_matrix.png",
-    "confusion_matrix_normalized.png",
-    "PR_curve.png",
-    "F1_curve.png",
-    "P_curve.png",
-    "R_curve.png",
-    "labels.jpg",
-    "val_batch0_labels.jpg",
-    "val_batch0_pred.jpg",
-    "args.yaml",
-]
+# GPU (например, в Colab), если есть, иначе CPU
+DEVICE = 0 if torch.cuda.is_available() else "cpu"
+
+# Какие файлы из папки обучения Ultralytics логировать как артефакты.
+# (имена кривых зависят от версии: PR_curve.png / BoxPR_curve.png, поэтому берём по расширению)
+DIAGNOSTIC_SUFFIXES = {".png", ".jpg", ".csv", ".yaml"}
 
 
 # --------------------------------------------------------------------------
 # Данные
 # --------------------------------------------------------------------------
 def prepare_data_yaml(data_dir: Path, out_dir: Path) -> tuple[Path, list[str]]:
-    """Собрать data.yaml с абсолютным путём
+    """Собрать data.yaml с абсолютным путём (Roboflow-овский с '../' капризный).
 
     Возвращает путь к новому yaml и список сплитов для оценки (val [+ test]).
     """
@@ -71,7 +64,7 @@ def prepare_data_yaml(data_dir: Path, out_dir: Path) -> tuple[Path, list[str]]:
 
 
 def build_dataset(data_dir: Path, name: str):
-    """Описать датасет для MLflow (список файлов по сплитам) для связи Run <-> Dataset."""
+    """Описать датасет для MLflow (список файлов по сплитам) — для связи Run <-> Dataset."""
     rows = []
     for split in ("train", "valid", "val", "test"):
         folder = data_dir / split / "images"
@@ -153,7 +146,7 @@ def evaluate(weights: Path, data_yaml: Path, splits: list[str], imgsz: int) -> d
             split=split,
             imgsz=imgsz,
             batch=8,
-            device="cpu",
+            device=DEVICE,
             workers=0,
             plots=False,
             verbose=False,
@@ -189,7 +182,7 @@ def run_experiment(spec: dict, data_yaml: Path, splits: list[str], dataset, work
         model = YOLO(spec["weights"])
         model.train(
             data=str(data_yaml),
-            device="cpu",
+            device=DEVICE,
             workers=0,
             project=str(work_dir),
             name=spec["run_name"],
@@ -207,9 +200,8 @@ def run_experiment(spec: dict, data_yaml: Path, splits: list[str], dataset, work
         mlflow.log_metrics(final)
 
         # --- артефакты ---
-        for fname in DIAGNOSTICS:
-            f = save_dir / fname
-            if f.exists():
+        for f in sorted(save_dir.iterdir()):
+            if f.is_file() and f.suffix.lower() in DIAGNOSTIC_SUFFIXES:
                 mlflow.log_artifact(str(f), artifact_path="diagnostics")
         mlflow.log_artifact(str(data_yaml), artifact_path="data")
 
@@ -238,8 +230,10 @@ def main() -> None:
     cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     train_cfg = cfg["train"]
 
-    mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", cfg["mlflow"]["tracking_uri"]))
     mlflow.set_experiment(train_cfg["experiment_name"])
+
+    print(f"[i] MLflow: {mlflow.get_tracking_uri()} | устройство: {DEVICE}")
 
     data_dir = (ROOT / train_cfg["data_dir"]).resolve()
     work_dir = ROOT / "runs"
