@@ -18,7 +18,7 @@ def best_run_id(experiment_name: str) -> str:
         max_results=1,
     )
     if df.empty:
-        raise SystemExit(f"[-] В эксперименте '{experiment_name}' " "нет завершенных Runs.")
+        raise SystemExit(f"[-] В эксперименте '{experiment_name}' нет завершенных Runs.")
     return str(df.loc[0, "run_id"])
 
 
@@ -111,7 +111,7 @@ def main() -> None:
             args.alias,
             str(args.version),
         )
-        print(f"[+] Alias '{args.alias}' успешно привязан " f"к версии {args.version}")
+        print(f"[+] Alias '{args.alias}' успешно привязан к версии {args.version}")
         print_registry(name)
         return
 
@@ -121,7 +121,7 @@ def main() -> None:
         model_uri=f"runs:/{run_id}/model",
         name=name,
     )
-    print(f"[+] Зарегистрирована версия {mv.version} " f"модели '{name}' (run_id={run_id})")
+    print(f"[+] Зарегистрирована версия {mv.version} модели '{name}' (run_id={run_id})")
 
     # Получаем метрику из Run и привязываем к версии модели.
     run = client.get_run(run_id)
@@ -136,7 +136,7 @@ def main() -> None:
         )
 
     if score is not None:
-        desc = f"Run '{run.info.run_name}'. Основная метрика " f"{PRIMARY_METRIC}={score:.4f}"
+        desc = f"Run '{run.info.run_name}'. Основная метрика {PRIMARY_METRIC}={score:.4f}"
     else:
         desc = f"Run '{run.info.run_name}'"
 

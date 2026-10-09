@@ -1,5 +1,6 @@
 """API endpoint for fire and smoke detection."""
 
+import asyncio
 import logging
 import tempfile
 from pathlib import Path
@@ -76,4 +77,4 @@ async def process_image(
     finally:
         await file.close()
         if temp_path is not None:
-            Path(temp_path).unlink(missing_ok=True)
+            await asyncio.to_thread(Path(temp_path).unlink, missing_ok=True)
