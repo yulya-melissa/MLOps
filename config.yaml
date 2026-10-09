@@ -2,9 +2,9 @@ dataset:
   kaggle_name: "backpacker/fasdd-flame-and-smoke-detection-dataset"
   raw_dir: "data/fasdd"
   summary_csv: "data/fasdd_parsed_summary.csv"
-  # Настройки режима сэмплирования
-  sample_mode: true     # true = брать только часть данных, false = качать/копировать всё
-  sample_limit: 500      # Количество файлов для сэмпла (если sample_mode: true)
+  # Наѝтройки режима ѝѝмплированиѝ
+  sample_mode: true # true = брать только чаѝть данных, false = качать/копировать вѝё
+  sample_limit: 500 # Количеѝтво файлов длѝ ѝѝмпла (еѝли sample_mode: true)
 
 mlflow:
   tracking_uri: "http://localhost:5000"
@@ -14,9 +14,9 @@ mlflow:
 train:
   experiment_name: "fire_detection_dev"
   data_dir: "data/fasdd"
-  epochs: 5
-  batch: 8
-  fraction: 0.3
+  epochs: 2
+  batch: 4
+  fraction: 0.02
   seed: 42
   registered_model_name: "fire-detector"
-  dataset_name: "fire-detection-roboflow-v4"      # надо поменять, я брала урезанный датасет с roboflow, а не целый с kaggle
+  dataset_name: "fire-detection-roboflow-v4" # надо поменѝть, ѝ брала урезанный датаѝет ѝ roboflow, а не целый ѝ kaggle

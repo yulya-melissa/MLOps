@@ -1,4 +1,4 @@
-"""Настройки приложения из переменных окружения (pydantic-settings)."""
+"""Наѝтройки приложениѝ из переменных окружениѝ (pydantic-settings)."""
 
 from functools import lru_cache
 from typing import Literal
@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Состояние приложения, собираемое из env / .env."""
+    """Соѝтоѝние приложениѝ, ѝобираемое из env / .env."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
-    # Параметры подключения к Postgres — собираем URL из частей.
+    # Параметры подключениѝ к Postgres — ѝобираем URL из чаѝтей.
     postgres_user: str = "postgres"
     postgres_password: str = "postgres"
     postgres_host: str = "localhost"
@@ -36,9 +36,12 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 5
     db_command_timeout: float = 5.0
 
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_model_uri: str = "models:/fire-detector@champion"
+
     @property
     def database_url(self) -> str:
-        """Собрать DSN для asyncpg из отдельных полей."""
+        """Собрать DSN длѝ asyncpg из отдельных полей."""
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -47,5 +50,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Вернуть кешированный экземпляр настроек."""
+    """Вернуть кешированный ѝкземплѝр наѝтроек."""
     return Settings()

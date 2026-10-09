@@ -1,7 +1,4 @@
-"""Точка сборки приложения FastAPI.
-
-Запуск: `uv run uvicorn src.app:app --reload`
-"""
+"""Точка сборки приложения FastAPI."""
 
 import logging
 import time
@@ -9,38 +6,53 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
+import mlflow
 from fastapi import FastAPI, Request
+from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
 from src import config, db, logging_config
-from src.api import health, version
+from src.api import health, process, ui, version
 
 log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Жизненный цикл: создать пул БД при старте, закрыть при остановке."""
+    """Initialize resources on startup and release them on shutdown."""
     settings = config.get_settings()
     logging_config.setup_logging(settings.log_level)
     app.state.settings = settings
+
     app.state.db_pool = await db.create_db_pool(settings)
-    log.info(
-        "Сервис %s версии %s успешно стартовал! (env=%s, debug=%s)",
-        settings.app_name,
-        settings.version,
-        settings.environment,
-        settings.debug,
-    )
+
     try:
+        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
+        log.info(
+            "Loading inference model from MLflow: %s",
+            settings.mlflow_model_uri,
+        )
+
+        app.state.inference_model = await run_in_threadpool(
+            mlflow.pyfunc.load_model,
+            settings.mlflow_model_uri,
+        )
+
+        log.info(
+            "Service %s version %s started successfully!",
+            settings.app_name,
+            settings.version,
+        )
+
         yield
     finally:
         await db.close_db_pool(app.state.db_pool)
-        log.info("Приложение остановлено")
+        log.info("Application stopped")
 
 
 def create_app() -> FastAPI:
-    """Собрать и настроить приложение FastAPI."""
+    """Собрать и наѝтроить приложение FastAPI."""
     settings = config.get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -53,7 +65,7 @@ def create_app() -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Поставить request_id в контекст и залогировать запрос."""
+        """Поѝтавить request_id в контекѝт и залогировать запроѝ."""
         request_id = uuid.uuid4().hex[:8]
         token = logging_config.REQUEST_ID.set(request_id)
         start = time.perf_counter()
@@ -75,6 +87,8 @@ def create_app() -> FastAPI:
 
     app.include_router(version.router)
     app.include_router(health.router)
+    app.include_router(process.router)
+    app.include_router(ui.router)
     return app
 
 
