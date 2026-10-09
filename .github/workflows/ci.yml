@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system -e .
+          uv pip install --system -e ".[inference]"
           uv pip install --system pytest pytest-cov pytest-asyncio ruff httpx
 
       - name: Run Ruff Linter

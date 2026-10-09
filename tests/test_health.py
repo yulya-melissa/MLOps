@@ -1,18 +1,37 @@
 """Теѝты health-ѝндпоинтов (интеграционные, требуют реальной инфраѝтруктуры)."""
 
-import socket
+import asyncio
 
+import asyncpg
 import pytest
 from httpx import AsyncClient
 
+from src.config import get_settings
+
+
+async def _postgres_available_async() -> bool:
+    """????????? ???????? ?????? ? PostgreSQL ??????????? SQL-???????."""
+    conn = None
+
+    try:
+        conn = await asyncpg.connect(
+            dsn=get_settings().database_url,
+            timeout=1.0,
+        )
+        await conn.fetchval("SELECT current_setting('server_version')")
+        return True
+
+    except Exception:
+        return False
+
+    finally:
+        if conn is not None:
+            await conn.close()
+
 
 def postgres_available() -> bool:
-    """Проверить, доѝтупен ли Postgres на localhost:5432."""
-    try:
-        with socket.create_connection(("localhost", 5432), timeout=1):
-            return True
-    except OSError:
-        return False
+    """????????? PostgreSQL ?? ??????? ??????????????? ?????."""
+    return asyncio.run(_postgres_available_async())
 
 
 async def test_liveness_endpoint(client: AsyncClient) -> None:
