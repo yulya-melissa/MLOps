@@ -1,33 +1,36 @@
-"""????? pytest-????????."""
+"""Shared pytest fixtures."""
 
-from unittest.mock import MagicMock
+from importlib import import_module
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-import src.app as app_module
-from src.app import create_app
+app_module = import_module("src.app")
 
 
 @pytest.fixture
 async def app(monkeypatch):
-    """?????????? ??? ?????? ??? ?????????? MLflow Registry."""
+    """Create an app without loading a real MLflow model."""
+
+    fake_model = MagicMock(name="fake_inference_model")
 
     monkeypatch.setattr(
-        app_module.mlflow.pyfunc,
-        "load_model",
-        lambda _model_uri: MagicMock(name="fake_inference_model"),
+        app_module,
+        "run_in_threadpool",
+        AsyncMock(return_value=fake_model),
     )
 
-    _app = create_app()
+    test_app = app_module.create_app()
 
-    async with _app.router.lifespan_context(_app):
-        yield _app
+    async with test_app.router.lifespan_context(test_app):
+        yield test_app
 
 
 @pytest.fixture
 async def client(app):
-    """???????? HTTP-??????."""
+    """Create an HTTP client for API tests."""
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
