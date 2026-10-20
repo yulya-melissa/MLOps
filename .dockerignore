@@ -1,9 +1,7 @@
-.git
-.gitignore
-.github
-.venv
-__pycache__
-*.pyc
-...
-tests
-...
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src
+**/__pycache__
+**/*.pyc

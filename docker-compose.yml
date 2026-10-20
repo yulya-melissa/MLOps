@@ -1,3 +1,9 @@
+x-pipeline-env: &pipeline-env
+  FIRE_RABBIT_URL: amqp://fire:fire_password@rabbitmq:5672/
+  FIRE_TASKS_QUEUE: fire.tasks
+  FIRE_QUEUE_MAX_LENGTH: 100
+  FIRE_DATA_DIR: /app/data
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -108,18 +114,80 @@ services:
       AWS_SECRET_ACCESS_KEY: minioadmin
       MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
     command: >
-      /bin/sh -c "
-      pip install --no-cache-dir boto3 &&
       mlflow server
       --host 0.0.0.0
       --port 5000
       --backend-store-uri postgresql://mlflow:mlflow_password@mlflow-db:5432/mlflow
       --artifacts-destination s3://mlflow-artifacts/
       --serve-artifacts
-      "
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     restart: unless-stopped
+
+  # ---------------------------------------------------------------
+  # Конвейер: источник -> ограниченная очередь RabbitMQ -> воркер
+  # ---------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: fire_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: fire
+      RABBITMQ_DEFAULT_PASS: fire_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    # container_name намеренно НЕ задаём: иначе не получится --scale worker=2
+    environment:
+      <<: *pipeline-env
+      FIRE_MLFLOW_TRACKING_URI: http://mlflow:5000
+      FIRE_MODEL_URI: models:/fire-detector@champion
+      FIRE_PREFETCH_COUNT: 1
+      FIRE_INFERENCE_CONCURRENCY: 1
+      FIRE_INFERENCE_DELAY_S: 0.5
+      OMP_NUM_THREADS: 1
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    restart: unless-stopped
+
+  source:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    command: ["python", "-m", "src.source"]
+    profiles: ["load"]   # сам не стартует: docker compose --profile load up source
+    environment:
+      <<: *pipeline-env
+      FIRE_SOURCE_REPEAT: 1
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   pg_data:
   mlflow_pg_data:
   rustfs_data:
+  rabbitmq_data:

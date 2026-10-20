@@ -36,6 +36,26 @@ class Settings(BaseSettings):
     db_pool_max_size: int = 5
     db_command_timeout: float = 5.0
 
+    # --- RabbitMQ / конвейер ---
+    rabbit_url: str = "amqp://fire:fire_password@localhost:5672/"
+    tasks_queue: str = "fire.tasks"
+    queue_max_length: int = 100
+
+    # --- воркер ---
+    prefetch_count: int = 1
+    inference_concurrency: int = 1
+    inference_delay_s: float = 0.0
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    model_uri: str = "models:/fire-detector@champion"
+    data_dir: str = "data"
+
+    # --- источник ---
+    source_limit: int = 0  # 0 = без ограничения
+    source_repeat: int = 1  # сколько раз пройти датасет
+    source_backoff_min_s: float = 0.01
+    source_backoff_max_s: float = 0.2
+    source_report_interval_s: float = 2.0
+
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_model_uri: str = "models:/fire-detector@champion"
 
