@@ -31,12 +31,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         log.info(
             "Loading inference model from MLflow: %s",
-            settings.mlflow_model_uri,
+            settings.model_uri,
         )
 
         app.state.inference_model = await run_in_threadpool(
             mlflow.pyfunc.load_model,
-            settings.mlflow_model_uri,
+            settings.model_uri,
         )
 
         log.info(

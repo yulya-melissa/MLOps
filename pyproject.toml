@@ -23,6 +23,13 @@ inference = [
     "mlflow>=2.22.5,<3",
     "pandas>=2.3.3",
     "python-multipart>=0.0.20",
+    # torch/torchvision — прямые зависимости, чтобы [tool.uv.sources] направил их
+    # в CPU-only индекс (см. ниже): иначе ultralytics тянет torch с CUDA
+    # (~7 ГБ библиотек), который в контейнерах не используется.
+    # ВАЖНО: версии torch и torchvision должны быть парными, иначе
+    # inference падает с "operator torchvision::nms does not exist".
+    "torch>=2.0",
+    "torchvision>=0.19",
     "ultralytics>=8.4.173",
 ]
 
@@ -67,8 +74,21 @@ worker = [
     "faststream[cli]>=0.7.7",
     "mlflow>=2.13.0,<3",
     "pandas>=2.3.3",
+    "torch>=2.0",
+    "torchvision>=0.19",
     "ultralytics>=8.4.173",
 ]
+
+# CPU-only сборка torch: в контейнерах GPU нет, а CUDA-библиотеки
+# (cudnn/cublas, ~5 ГБ) раздувают образ и замедляют сборку.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

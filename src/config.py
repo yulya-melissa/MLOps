@@ -56,9 +56,6 @@ class Settings(BaseSettings):
     source_backoff_max_s: float = 0.2
     source_report_interval_s: float = 2.0
 
-    mlflow_tracking_uri: str = "http://localhost:5000"
-    mlflow_model_uri: str = "models:/fire-detector@champion"
-
     @property
     def database_url(self) -> str:
         """Собрать DSN длѝ asyncpg из отдельных полей."""

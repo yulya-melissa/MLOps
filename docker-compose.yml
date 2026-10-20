@@ -38,9 +38,14 @@ services:
       FIRE_POSTGRES_DB: fire_detection
       FIRE_LOG_LEVEL: INFO
       FIRE_ENVIRONMENT: production
+      # модель для inference-эндпоинта: тянем из того же MLflow, что и воркер
+      FIRE_MLFLOW_TRACKING_URI: http://mlflow:5000
+      FIRE_MODEL_URI: models:/fire-detector@champion
     depends_on:
       postgres:
         condition: service_healthy
+      mlflow:
+        condition: service_started
     restart: unless-stopped
 
   mlflow-db:
@@ -180,6 +185,7 @@ services:
     environment:
       <<: *pipeline-env
       FIRE_SOURCE_REPEAT: 1
+      FIRE_SOURCE_LIMIT: 500   # лимит задач на один прогон (для воспроизводимых замеров)
     volumes:
       - ./data:/app/data:ro
     depends_on:
