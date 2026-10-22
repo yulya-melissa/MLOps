@@ -1,7 +1,6 @@
 """Shared pytest fixtures."""
 
 from importlib import import_module
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -10,17 +9,10 @@ app_module = import_module("src.app")
 
 
 @pytest.fixture
-async def app(monkeypatch):
-    """Create an app without loading a real MLflow model."""
-
-    fake_model = MagicMock(name="fake_inference_model")
-
-    monkeypatch.setattr(
-        app_module,
-        "run_in_threadpool",
-        AsyncMock(return_value=fake_model),
-    )
-
+async def app():
+    """
+    Создание тестового приложения FastAPI без загрузки модели (в API модель больше не грузится)
+    """
     test_app = app_module.create_app()
 
     async with test_app.router.lifespan_context(test_app):
@@ -29,8 +21,7 @@ async def app(monkeypatch):
 
 @pytest.fixture
 async def client(app):
-    """Create an HTTP client for API tests."""
-
+    """Создание HTTP-клиента для тестирования API."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",

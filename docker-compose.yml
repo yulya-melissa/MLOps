@@ -3,6 +3,8 @@ x-pipeline-env: &pipeline-env
   FIRE_TASKS_QUEUE: fire.tasks
   FIRE_QUEUE_MAX_LENGTH: 100
   FIRE_DATA_DIR: /app/data
+  FIRE_UPLOAD_DIR: /app/uploads
+  FIRE_API_RETRY_AFTER_S: 2
 
 services:
   postgres:
@@ -17,7 +19,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fire_detection"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d fire_detection" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,6 +33,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      <<: *pipeline-env
       FIRE_POSTGRES_HOST: postgres
       FIRE_POSTGRES_PORT: 5432
       FIRE_POSTGRES_USER: postgres
@@ -38,11 +41,14 @@ services:
       FIRE_POSTGRES_DB: fire_detection
       FIRE_LOG_LEVEL: INFO
       FIRE_ENVIRONMENT: production
-      # модель для inference-эндпоинта: тянем из того же MLflow, что и воркер
       FIRE_MLFLOW_TRACKING_URI: http://mlflow:5000
       FIRE_MODEL_URI: models:/fire-detector@champion
+    volumes:
+      - ./uploads:/app/uploads:rw
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       mlflow:
         condition: service_started
@@ -58,7 +64,7 @@ services:
     volumes:
       - mlflow_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      test: [ "CMD-SHELL", "pg_isready -U mlflow -d mlflow" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -77,7 +83,7 @@ services:
     volumes:
       - rustfs_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
+      test: [ "CMD-SHELL", "nc -z localhost 9000 || exit 1" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -94,10 +100,7 @@ services:
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_DEFAULT_REGION: us-east-1
     entrypoint: >
-      /bin/sh -c "
-      aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket mlflow-artifacts --region us-east-1 || true;
-      echo 'Bucket ready';
-      "
+      /bin/sh -c " aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket mlflow-artifacts --region us-east-1 || true; echo 'Bucket ready'; "
     restart: "no"
 
   mlflow:
@@ -119,14 +122,9 @@ services:
       AWS_SECRET_ACCESS_KEY: minioadmin
       MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
     command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri postgresql://mlflow:mlflow_password@mlflow-db:5432/mlflow
-      --artifacts-destination s3://mlflow-artifacts/
-      --serve-artifacts
+      mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mlflow:mlflow_password@mlflow-db:5432/mlflow --artifacts-destination s3://mlflow-artifacts/ --serve-artifacts
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -144,11 +142,11 @@ services:
       RABBITMQ_DEFAULT_PASS: fire_password
     ports:
       - "5672:5672"
-      - "15672:15672"   # management UI
+      - "15672:15672" # management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 5s
       timeout: 10s
       retries: 10
@@ -161,6 +159,11 @@ services:
     # container_name намеренно НЕ задаём: иначе не получится --scale worker=2
     environment:
       <<: *pipeline-env
+      FIRE_POSTGRES_HOST: postgres
+      FIRE_POSTGRES_PORT: 5432
+      FIRE_POSTGRES_USER: postgres
+      FIRE_POSTGRES_PASSWORD: postgres_password
+      FIRE_POSTGRES_DB: fire_detection
       FIRE_MLFLOW_TRACKING_URI: http://mlflow:5000
       FIRE_MODEL_URI: models:/fire-detector@champion
       FIRE_PREFETCH_COUNT: 1
@@ -169,25 +172,31 @@ services:
       OMP_NUM_THREADS: 1
     volumes:
       - ./data:/app/data:ro
+      - ./uploads:/app/uploads:ro
     depends_on:
+      postgres:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       mlflow:
         condition: service_started
+    stop_grace_period: 60s
+    stop_signal: SIGTERM
     restart: unless-stopped
 
   source:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    command: ["python", "-m", "src.source"]
-    profiles: ["load"]   # сам не стартует: docker compose --profile load up source
+    command: [ "python", "-m", "src.source" ]
+    profiles: [ "load" ] # сам не стартует: docker compose --profile load up source
     environment:
       <<: *pipeline-env
       FIRE_SOURCE_REPEAT: 1
-      FIRE_SOURCE_LIMIT: 500   # лимит задач на один прогон (для воспроизводимых замеров)
+      FIRE_SOURCE_LIMIT: 500 # лимит задач на один прогон (для воспроизводимых замеров)
     volumes:
       - ./data:/app/data:ro
+      - ./uploads:/app/uploads:ro
     depends_on:
       rabbitmq:
         condition: service_healthy
