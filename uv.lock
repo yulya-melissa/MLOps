@@ -818,6 +818,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "faststream", extra = ["rabbit"] },
     { name = "pydantic-settings" },
+    { name = "testcontainers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -843,6 +844,7 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "testcontainers", extra = ["rabbitmq"] },
 ]
 eda = [
     { name = "boto3" },
@@ -882,6 +884,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'inference'", specifier = ">=2.3.3" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "python-multipart", marker = "extra == 'inference'", specifier = ">=0.0.20" },
+    { name = "testcontainers", specifier = ">=4.15.0" },
     { name = "torch", marker = "extra == 'inference'", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", marker = "extra == 'inference'", specifier = ">=0.19", index = "https://download.pytorch.org/whl/cpu" },
     { name = "ultralytics", marker = "extra == 'inference'", specifier = ">=8.4.173" },
@@ -899,6 +902,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.16.7" },
+    { name = "testcontainers", extras = ["rabbitmq"], specifier = ">=4.15.0" },
 ]
 eda = [
     { name = "boto3", specifier = ">=1.43.104" },
@@ -1941,6 +1945,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pika"
+version = "1.4.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/26/54e0b98a7f60b474cb0a6c05ecf048d4bc8c866e10ab1c82bc83865e7421/pika-1.4.4.tar.gz", hash = "sha256:8cfc8b33a5cb16e733bd60cffca9732c0d1d761ecd80a89f34ed7df2cd38d6d6", size = 154713, upload-time = "2026-08-06T21:33:39.836Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7c/f3/921170b78779ac3f8b405cb28fce88acca1562ac114072cbf0a115e19bb9/pika-1.4.4-py3-none-any.whl", hash = "sha256:48de960c97a93b55db06b8be4c53eb977c9c8a2754c57cdae9097abcbd70ce04", size = 165275, upload-time = "2026-08-06T21:33:38.449Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2942,6 +2955,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]
+
+[[package]]
+name = "testcontainers"
+version = "4.15.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docker" },
+    { name = "python-dotenv" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4b/13/2cc466bddf26d0085f30a2b2bd56b7f8708b54a54db833eec97c5c69129b/testcontainers-4.15.0.tar.gz", hash = "sha256:085cde086337632e19002719460b7b80bbab2bdd51bb3ea04f77d0de96504706", size = 95340, upload-time = "2026-07-24T23:08:01.731Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/7e/424aac8b355597835deb333e757a0e94b5ccf38ad00f07fe6ed1f4e17c88/testcontainers-4.15.0-py3-none-any.whl", hash = "sha256:8796c14e76604031ad39cf0ed3b8e9806283a1fbf5270965c2b1c594caa31b74", size = 160771, upload-time = "2026-07-24T23:08:00.13Z" },
+]
+
+[package.optional-dependencies]
+rabbitmq = [
+    { name = "pika" },
 ]
 
 [[package]]

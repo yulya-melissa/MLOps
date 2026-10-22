@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "faststream[rabbit]>=0.6",
     "pydantic-settings>=2.15.0",
+    "testcontainers>=4.15.0",
     "uvicorn[standard]>=0.53.0",
 ]
 
@@ -51,6 +52,7 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.7",
+    "testcontainers[rabbitmq]>=4.15.0",
 ]
 eda = [
     "boto3>=1.43.104",

@@ -7,8 +7,10 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from faststream.rabbit import TestRabbitBroker
 
 from src.pipeline.messages import TaskMessage
+from src.pipeline.topology import get_tasks_queue
 from src.services.tasks import InMemoryTaskRepository, TaskStatus
 from src.worker import app as worker
 
@@ -111,3 +113,31 @@ async def test_result_written_before_ack(repo, predict):
     await worker._process(MSG, message, MagicMock())
 
     assert seen["status"] is TaskStatus.DONE
+
+
+# --- Через TestRabbitBroker: сообщение проходит настоящую подписку воркера ---------
+
+
+async def test_handler_via_test_broker_success(repo, predict):
+    """Сообщение, опубликованное в очередь задач, доходит до handle_task и даёт DONE."""
+    async with TestRabbitBroker(worker.broker) as br:
+        await br.publish(MSG, queue=get_tasks_queue())
+
+    predict.assert_awaited_once()
+    task = await repo.get_task(MSG.task_id)
+    assert task is not None
+    assert task.status is TaskStatus.DONE
+
+
+async def test_handler_via_test_broker_last_attempt_fails(repo, predict):
+    """Ошибка на последней попытке (заголовок x-delivery-count) => задача FAILED."""
+    predict.side_effect = RuntimeError("boom")
+    last = worker.settings.worker_max_attempts - 1
+
+    async with TestRabbitBroker(worker.broker) as br:
+        await br.publish(MSG, queue=get_tasks_queue(), headers={"x-delivery-count": last})
+
+    task = await repo.get_task(MSG.task_id)
+    assert task is not None
+    assert task.status is TaskStatus.FAILED
+    assert task.error == "boom"
