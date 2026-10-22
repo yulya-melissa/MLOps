@@ -11,7 +11,7 @@ OUT = ROOT / "results" / "experiments"
 
 EXPERIMENTS = {
     "Ограниченная, 1 worker": {
-        "csv": "limited_1_worker_retry.csv",
+        "csv": "limited_1_worker_rerun.csv",
         "source_logs": [
             "limited_1_worker_retry_source.log",
             "limited_1_worker_source.log",
@@ -22,7 +22,7 @@ EXPERIMENTS = {
         ],
     },
     "Без лимита, 1 worker": {
-        "csv": "unlimited_1_worker.csv",
+        "csv": "unlimited_1_worker_rerun.csv",
         "source_logs": [
             "unlimited_1_worker_source.log",
         ],
@@ -31,7 +31,7 @@ EXPERIMENTS = {
         ],
     },
     "Ограниченная, 2 worker": {
-        "csv": "limited_2_workers_retry.csv",
+        "csv": "limited_2_workers_rerun.csv",
         "source_logs": [
             "limited_2_workers_retry_source.log",
             "limited_2_workers_source.log",
@@ -42,7 +42,7 @@ EXPERIMENTS = {
         ],
     },
     "Без лимита, 2 worker": {
-        "csv": "unlimited_2_workers.csv",
+        "csv": "unlimited_2_workers_rerun.csv",
         "source_logs": [
             "unlimited_2_workers_source.log",
         ],
