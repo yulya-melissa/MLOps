@@ -163,29 +163,31 @@ fileInput.addEventListener("change", () => {
     statusBox.textContent = "Image selected. Ready to analyze.";
 });
 
-function showResult(data) {
+function showResult(taskData) {
     const summary = document.getElementById("summary");
     const details = document.getElementById("details");
     summary.replaceChildren();
     details.replaceChildren();
 
+    const detections = taskData.result || [];
+
     const count = el("div", "stat");
     count.append(el("span", "", "Objects detected"));
-    count.append(el("strong", "", String(data.detections_count ?? 0)));
+    count.append(el("strong", "", String(detections.length)));
     summary.append(count);
 
-    const filename = el("div", "stat");
-    filename.append(el("span", "", "File"));
-    const name = el("strong", "", data.filename || "Uploaded image");
-    name.style.overflowWrap = "anywhere";
-    filename.append(name);
-    summary.append(filename);
+    const taskIdStat = el("div", "stat");
+    taskIdStat.append(el("span", "", "Task ID"));
+    const idStr = el("strong", "", taskData.task_id || "—");
+    idStr.style.overflowWrap = "anywhere";
+    taskIdStat.append(idStr);
+    summary.append(taskIdStat);
 
-    if (!data.detections || data.detections.length === 0) {
+    if (detections.length === 0) {
         details.append(el("div", "notice success",
             "No objects were detected in this image."));
     } else {
-        data.detections.forEach((d, i) => {
+        detections.forEach((d, i) => {
             const card = el("article", "detection");
             const heading = el("h3", "", "Detection " + (i + 1) + " ");
             heading.append(el("span", "pill", d.class_name || "Unknown"));
@@ -215,6 +217,32 @@ function showResult(data) {
     results.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+async function pollTask(taskId) {
+    while (true) {
+        try {
+            const res = await fetch(`/api/v1/tasks/${taskId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === "DONE") {
+                    showResult(data);
+                    statusBox.textContent = "Analysis completed successfully.";
+                    return;
+                } else if (data.status === "FAILED") {
+                    throw new Error(data.error || "Task processing failed.");
+                } else {
+                    statusBox.textContent = `Task status: ${data.status}. Processing...`;
+                }
+            }
+        } catch (err) {
+            if (err.message && err.message !== "Failed to fetch") {
+                throw err;
+            }
+        }
+        // Ждем 500 мс перед следующим запросом
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+}
+
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const file = fileInput.files[0];
@@ -224,27 +252,39 @@ form.addEventListener("submit", async (event) => {
     }
 
     submit.disabled = true;
-    submit.textContent = "Analyzing...";
-    statusBox.textContent = "The model is processing your image. Please wait.";
+    submit.textContent = "Submitting...";
+    statusBox.textContent = "Submitting task to the pipeline...";
     results.style.display = "none";
 
     try {
         const body = new FormData();
         body.append("file", file);
 
-        const response = await fetch("/process", {
+        const response = await fetch("/api/v1/tasks", {
             method: "POST",
             body
         });
+
+        if (response.status === 503) {
+            const retryAfter = response.headers.get("Retry-After") || "2";
+            const data = await response.json().catch(() => ({}));
+            const detailMsg = data.detail || "System overload";
+            throw new Error(`${detailMsg}. Система перегружена, повторите через ${retryAfter} с.`);
+        }
+
         const data = await response.json();
 
         if (!response.ok) {
             throw new Error(typeof data.detail === "string"
-                ? data.detail : "Image processing failed.");
+                ? data.detail : "Task submission failed.");
         }
 
-        showResult(data);
-        statusBox.textContent = "Analysis completed successfully.";
+        const taskId = data.task_id;
+        statusBox.textContent = `Task created (${taskId}). Waiting for results...`;
+        submit.textContent = "Processing...";
+
+        await pollTask(taskId);
+
     } catch (error) {
         results.style.display = "block";
         document.getElementById("summary").replaceChildren();
