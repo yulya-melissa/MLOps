@@ -1,12 +1,15 @@
 """Управление пулом соединений с Postgres (asyncpg)."""
 
 import logging
+from pathlib import Path
 
 import asyncpg
 
 from src.config import Settings
 
 log = logging.getLogger(__name__)
+
+_SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 
 async def create_db_pool(settings: Settings) -> asyncpg.Pool:
@@ -27,6 +30,15 @@ async def create_db_pool(settings: Settings) -> asyncpg.Pool:
         settings.database_url.rsplit("@", 1)[-1],
     )
     return pool
+
+
+async def ensure_schema(pool: asyncpg.Pool) -> None:
+    """Создать таблицы, если их нет. Безопасно вызывать при каждом старте."""
+    async with pool.acquire() as conn, conn.transaction():
+        # API и воркер стартуют одновременно: lock защищает от гонки CREATE TABLE
+        await conn.execute("SELECT pg_advisory_xact_lock(7403001)")
+        await conn.execute(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    log.info("Схема БД проверена")
 
 
 async def close_db_pool(pool: asyncpg.Pool) -> None:

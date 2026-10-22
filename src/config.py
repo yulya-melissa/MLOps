@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = "http://localhost:5000"
     model_uri: str = "models:/fire-detector@champion"
     data_dir: str = "data"
+    tasks_dlq_queue: str = "fire.tasks.dlq"
+
+    # --- API-граница (п. 4) ---
+    api_retry_after_s: int = 2
+    api_publish_timeout_s: float = 2.0
+    upload_dir: str = "uploads"
+
+    # --- надёжность воркера (п. 5) ---
+    worker_max_attempts: int = 3
+    worker_retry_delay_s: float = 2.0
+    worker_shutdown_timeout_s: float = 30.0
 
     # --- источник ---
     source_limit: int = 0  # 0 = без ограничения
