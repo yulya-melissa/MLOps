@@ -27,9 +27,9 @@ class Settings(BaseSettings):
 
     # Параметры подключениѝ к Postgres — ѝобираем URL из чаѝтей.
     postgres_user: str = "postgres"
-    postgres_password: str = "postgres"
+    postgres_password: str = "postgres_password"
     postgres_host: str = "localhost"
-    postgres_port: int = 5432
+    postgres_port: int = 5433
     postgres_db: str = "fire_detection"
 
     db_pool_min_size: int = 0

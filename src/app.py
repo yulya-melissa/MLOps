@@ -1,18 +1,20 @@
 """Точка сборки приложения FastAPI."""
 
+import asyncio
 import logging
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-import mlflow
 from fastapi import FastAPI, Request
-from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
 from src import config, db, logging_config
-from src.api import health, process, ui, version
+from src.api import health, tasks, ui, version
+from src.pipeline.client import TaskPublisher
+from src.services.tasks import PgTaskRepository
 
 log = logging.getLogger(__name__)
 
@@ -24,20 +26,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logging_config.setup_logging(settings.log_level)
     app.state.settings = settings
 
+    # Модель живёт только в воркере: API лишь принимает задачи и отдаёт статусы.
     app.state.db_pool = await db.create_db_pool(settings)
+    app.state.task_repo = PgTaskRepository(app.state.db_pool)
+    app.state.publisher = TaskPublisher(settings)
 
     try:
-        mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+        try:
+            await db.ensure_schema(app.state.db_pool)
+        except Exception:
+            # API должен подняться и при недоступной БД: /healthz покажет проблему.
+            log.warning("Не удалось проверить схему БД", exc_info=True)
 
-        log.info(
-            "Loading inference model from MLflow: %s",
-            settings.model_uri,
-        )
-
-        app.state.inference_model = await run_in_threadpool(
-            mlflow.pyfunc.load_model,
-            settings.model_uri,
-        )
+        await asyncio.to_thread(Path(settings.upload_dir).mkdir, parents=True, exist_ok=True)
 
         log.info(
             "Service %s version %s started successfully!",
@@ -47,12 +48,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         yield
     finally:
+        await app.state.publisher.close()
         await db.close_db_pool(app.state.db_pool)
         log.info("Application stopped")
 
 
 def create_app() -> FastAPI:
-    """Собрать и наѝтроить приложение FastAPI."""
+    """Собрать и настроить приложение FastAPI."""
     settings = config.get_settings()
     app = FastAPI(
         title=settings.app_name,
@@ -65,7 +67,7 @@ def create_app() -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Поѝтавить request_id в контекѝт и залогировать запроѝ."""
+        """Поставить request_id в контекст и залогировать запрос."""
         request_id = uuid.uuid4().hex[:8]
         token = logging_config.REQUEST_ID.set(request_id)
         start = time.perf_counter()
@@ -87,7 +89,7 @@ def create_app() -> FastAPI:
 
     app.include_router(version.router)
     app.include_router(health.router)
-    app.include_router(process.router)
+    app.include_router(tasks.router)
     app.include_router(ui.router)
     return app
 
