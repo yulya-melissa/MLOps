@@ -1,0 +1,10 @@
+services:
+  worker:
+    environment:
+      FIRE_TASKS_QUEUE: fire.tasks.unlimited
+      FIRE_QUEUE_MAX_LENGTH: 100000
+
+  source:
+    environment:
+      FIRE_TASKS_QUEUE: fire.tasks.unlimited
+      FIRE_QUEUE_MAX_LENGTH: 100000

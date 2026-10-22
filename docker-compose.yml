@@ -19,7 +19,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d fire_detection" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fire_detection"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -64,7 +64,7 @@ services:
     volumes:
       - mlflow_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U mlflow -d mlflow" ]
+      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -83,7 +83,7 @@ services:
     volumes:
       - rustfs_data:/data
     healthcheck:
-      test: [ "CMD-SHELL", "nc -z localhost 9000 || exit 1" ]
+      test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -124,7 +124,13 @@ services:
     command: >
       mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mlflow:mlflow_password@mlflow-db:5432/mlflow --artifacts-destination s3://mlflow-artifacts/ --serve-artifacts
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -132,7 +138,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------
-  # Конвейер: источник -> ограниченная очередь RabbitMQ -> воркер
+  # Конвейер: иѝточник -> ограниченнаѝ очередь RabbitMQ -> воркер
   # ---------------------------------------------------------------
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -141,12 +147,12 @@ services:
       RABBITMQ_DEFAULT_USER: fire
       RABBITMQ_DEFAULT_PASS: fire_password
     ports:
-      - "5672:5672"
+      - "5679:5672"
       - "15672:15672" # management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 10s
       retries: 10
@@ -156,7 +162,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    # container_name намеренно НЕ задаём: иначе не получится --scale worker=2
+    # container_name намеренно НЕ задаём: иначе не получитѝѝ --scale worker=2
     environment:
       <<: *pipeline-env
       FIRE_POSTGRES_HOST: postgres
@@ -188,12 +194,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    command: [ "python", "-m", "src.source" ]
-    profiles: [ "load" ] # сам не стартует: docker compose --profile load up source
+    command: ["python", "-m", "src.source"]
+    profiles: ["load"] # ѝам не ѝтартует: docker compose --profile load up source
     environment:
       <<: *pipeline-env
       FIRE_SOURCE_REPEAT: 1
-      FIRE_SOURCE_LIMIT: 500 # лимит задач на один прогон (для воспроизводимых замеров)
+      FIRE_SOURCE_LIMIT: 500 # лимит задач на один прогон (длѝ воѝпроизводимых замеров)
     volumes:
       - ./data:/app/data:ro
       - ./uploads:/app/uploads:ro
