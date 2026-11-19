@@ -60,7 +60,7 @@ class TaskPublisher:
             return self._broker
 
     async def _connect(self) -> RabbitBroker:
-        broker = RabbitBroker(self._url)
+        broker = RabbitBroker(self._url, logger=logging.getLogger("faststream"))
         try:
             await broker.start()
             # DLQ объявляем первой: без неё мёртвые сообщения были бы потеряны.

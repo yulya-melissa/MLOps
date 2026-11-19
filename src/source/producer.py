@@ -9,17 +9,17 @@ from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 from uuid import uuid4
+import logging
 
 from faststream.rabbit import RabbitBroker
 
-from src import logging_config
 from src.config import Settings, get_settings
 from src.pipeline.messages import TaskMessage
 from src import logging_config
 from src.pipeline.publisher import QueueFullError, publish_task
 from src.pipeline.topology import get_tasks_queue
 
-logging_config.setup_logging(get_settings().log_level, service_name="source")
+
 log = structlog.get_logger(__name__)
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
@@ -76,19 +76,16 @@ async def publish_with_backoff(
                 await publish_task(broker, msg)
             except QueueFullError:
                 stats.rejected += 1
-                log.debug(
+                log.info(
                     "source_queue_full_retry",
-                    task_id=msg.task_id,
                     delay_s=round(delay, 3),
+                    rejected=stats.rejected,
                 )
                 await asyncio.sleep(delay * (1 + random.random()))
                 delay = min(delay * 2, settings.source_backoff_max_s)
             else:
                 stats.published += 1
-                log.debug(
-                    "source_published",
-                    task_id=msg.task_id,
-                )
+                log.debug("source_published")
                 return
     finally:
         # сбрасываем contextvar
@@ -103,10 +100,10 @@ async def report(stats: Stats, interval_s: float) -> None:
         now = time.perf_counter()
         rate = (stats.published - last_published) / (now - last_time)
         log.info(
-            "published=%d rate=%.2f msg/s rejected(nack)=%d",
-            stats.published,
-            rate,
-            stats.rejected,
+            "source_progress",
+            published=stats.published,
+            rejected=stats.rejected,
+            rate_msg_s=round(rate, 2),
         )
         last_time, last_published = now, stats.published
 
@@ -117,7 +114,10 @@ async def run() -> None:
     stats = Stats()
     started = time.perf_counter()
 
-    async with RabbitBroker(settings.rabbit_url) as broker:
+    async with RabbitBroker(
+        settings.rabbit_url,
+        logger=logging.getLogger("faststream"),
+    ) as broker:
         # Объявляем очередь сами: иначе при старте раньше воркера сообщения
         # ушли бы в никуда (default exchange без очереди).
         await broker.declare_queue(get_tasks_queue())
@@ -130,9 +130,9 @@ async def run() -> None:
 
     elapsed = time.perf_counter() - started
     log.info(
-        "Готово: published=%d rejected=%d за %.1f c (средняя скорость %.2f msg/s)",
-        stats.published,
-        stats.rejected,
-        elapsed,
-        stats.published / elapsed if elapsed else 0.0,
+        "source_finished",
+        published=stats.published,
+        rejected=stats.rejected,
+        elapsed_s=round(elapsed, 1),
+        rate_msg_s=round(stats.published / elapsed, 2) if elapsed else 0.0,
     )

@@ -1,4 +1,5 @@
 x-pipeline-env: &pipeline-env
+  FIRE_LOG_LEVEL: ${FIRE_LOG_LEVEL:-INFO}
   FIRE_RABBIT_URL: amqp://fire:fire_password@rabbitmq:5672/
   FIRE_TASKS_QUEUE: fire.tasks
   FIRE_QUEUE_MAX_LENGTH: 100
@@ -19,7 +20,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fire_detection"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d fire_detection" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,7 +40,6 @@ services:
       FIRE_POSTGRES_USER: postgres
       FIRE_POSTGRES_PASSWORD: postgres_password
       FIRE_POSTGRES_DB: fire_detection
-      FIRE_LOG_LEVEL: INFO
       FIRE_ENVIRONMENT: production
       FIRE_MLFLOW_TRACKING_URI: http://mlflow:5000
       FIRE_MODEL_URI: models:/fire-detector@champion
@@ -64,7 +64,7 @@ services:
     volumes:
       - mlflow_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mlflow -d mlflow"]
+      test: [ "CMD-SHELL", "pg_isready -U mlflow -d mlflow" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -83,7 +83,7 @@ services:
     volumes:
       - rustfs_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 9000 || exit 1"]
+      test: [ "CMD-SHELL", "nc -z localhost 9000 || exit 1" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -124,13 +124,7 @@ services:
     command: >
       mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mlflow:mlflow_password@mlflow-db:5432/mlflow --artifacts-destination s3://mlflow-artifacts/ --serve-artifacts
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')",
-        ]
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -152,7 +146,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 5s
       timeout: 10s
       retries: 10
@@ -194,8 +188,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    command: ["python", "-m", "src.source"]
-    profiles: ["load"] # ѝам не ѝтартует: docker compose --profile load up source
+    command: [ "python", "-m", "src.source" ]
+    profiles: [ "load" ] # ѝам не ѝтартует: docker compose --profile load up source
     environment:
       <<: *pipeline-env
       FIRE_SOURCE_REPEAT: 1

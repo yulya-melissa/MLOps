@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
+import logging
 from faststream import AckPolicy, FastStream, Logger
 from faststream.rabbit import Channel, RabbitBroker, RabbitMessage
 
@@ -20,15 +21,17 @@ from src.worker.inference import InferenceEngine
 
 _settings = get_settings()
 
-# Сначала настраиваем structlog, ПОТОМ создаём логгер.
-# Иначе логгер кешируется со старой конфигурацией (без merge_contextvars),
-# и task_id не будет автоматически добавляться в JSON-логи.
 logging_config.setup_logging(_settings.log_level, service_name="worker")
 log = structlog.get_logger(__name__)
+
+# Свой логгер вместо автогенерируемого FastStream: иначе брокер ставит
+# собственный форматтер, и его записи не попадают в общий JSON-формат.
+_fs_logger = logging.getLogger("faststream")
 
 broker = RabbitBroker(
     _settings.rabbit_url,
     graceful_timeout=_settings.worker_shutdown_timeout_s,
+    logger=_fs_logger,
 )
 engine = InferenceEngine(
     tracking_uri=_settings.mlflow_tracking_uri,
@@ -86,12 +89,22 @@ async def lifespan() -> AsyncIterator[None]:
         log.info("graceful_shutdown_completed")
 
 
-app = FastStream(broker, lifespan=lifespan)
+app = FastStream(broker, lifespan=lifespan, logger=_fs_logger)
 
 
 @app.after_startup
 async def _declare_dlq() -> None:
     await broker.declare_queue(get_dlq_queue())
+
+
+@app.after_startup
+async def _restore_json_logs() -> None:
+    """Вернуть наш JSON-хендлер логгерам библиотек после их инициализации.
+
+    mlflow настраивает logging при импорте (внутри engine.load()), FastStream —
+    при старте брокера. К моменту after_startup оба уже загружены.
+    """
+    logging_config.capture_library_logs()
 
 
 async def _handle_failure(msg: TaskMessage, message: RabbitMessage, exc: Exception) -> None:

@@ -15,6 +15,17 @@ from src.api import health, tasks, ui, version
 from src.pipeline.client import TaskPublisher
 from src.services.tasks import PgTaskRepository
 
+
+# uvicorn применяет свой logging-конфиг до импорта приложения, поэтому
+# настраиваем логирование здесь, а не в lifespan: иначе строки
+# "Started server process" / "Waiting for application startup" уходят в его формате.
+logging_config.setup_logging(config.get_settings().log_level, service_name="api")
+
+log = structlog.get_logger(__name__)
+
+# Health-check'и дёргаются каждые несколько секунд — на INFO не логируем.
+_HEALTH_PATHS = frozenset({"/healthz", "/api/v1/health"})
+
 log = structlog.get_logger(__name__)
 
 
@@ -22,9 +33,6 @@ log = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialize resources on startup and release them on shutdown."""
     settings = config.get_settings()
-    logging_config.setup_logging(settings.log_level, service_name="api")
-    # Привязываем service_name ко всем логам этого процесса
-    structlog.contextvars.bind_contextvars(service="api")
 
     app.state.settings = settings
     app.state.db_pool = await db.create_db_pool(settings)
@@ -41,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         log.info(
             "service_started",
-            service=settings.app_name,
+            app=settings.app_name,
             version=settings.version,
             environment=settings.environment,
         )
@@ -71,7 +79,7 @@ def create_app() -> FastAPI:
         Health-check `/healthz` не логируем на INFO — он дёргается каждые 5 секунд
         и засоряет лог.
         """
-        is_health = request.url.path == "/healthz"
+        is_health = request.url.path in _HEALTH_PATHS
 
         request_id = uuid.uuid4().hex[:8]
         token = logging_config.REQUEST_ID.set(request_id)
