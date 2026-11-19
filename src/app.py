@@ -1,4 +1,5 @@
 """Точка сборки приложения FastAPI."""
+
 import asyncio
 import time
 import uuid
@@ -14,7 +15,6 @@ from src import config, db, logging_config
 from src.api import health, tasks, ui, version
 from src.pipeline.client import TaskPublisher
 from src.services.tasks import PgTaskRepository
-
 
 # uvicorn применяет свой logging-конфиг до импорта приложения, поэтому
 # настраиваем логирование здесь, а не в lifespan: иначе строки

@@ -1,7 +1,7 @@
 """Пакетный источник задач с обратной связью от брокера."""
 
 import asyncio
-import structlog
+import logging
 import random
 import time
 from collections.abc import Iterator
@@ -9,16 +9,15 @@ from dataclasses import dataclass
 from itertools import islice
 from pathlib import Path
 from uuid import uuid4
-import logging
 
+import structlog
 from faststream.rabbit import RabbitBroker
 
+from src import logging_config
 from src.config import Settings, get_settings
 from src.pipeline.messages import TaskMessage
-from src import logging_config
 from src.pipeline.publisher import QueueFullError, publish_task
 from src.pipeline.topology import get_tasks_queue
-
 
 log = structlog.get_logger(__name__)
 
@@ -76,12 +75,14 @@ async def publish_with_backoff(
                 await publish_task(broker, msg)
             except QueueFullError:
                 stats.rejected += 1
-                log.info(
+                pause_s = delay * (1 + random.random())
+                log.warning(
                     "source_queue_full_retry",
-                    delay_s=round(delay, 3),
+                    queue_max_length=settings.queue_max_length,
+                    delay_s=round(pause_s, 3),
                     rejected=stats.rejected,
                 )
-                await asyncio.sleep(delay * (1 + random.random()))
+                await asyncio.sleep(pause_s)
                 delay = min(delay * 2, settings.source_backoff_max_s)
             else:
                 stats.published += 1

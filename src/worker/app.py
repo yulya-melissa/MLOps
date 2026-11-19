@@ -1,14 +1,15 @@
 """
 FastStream-воркер: обработка задач с ack_policy (MANUAL), повторами (requeue=True) и DLQ
 """
+
 import asyncio
+import logging
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import structlog
-import logging
 from faststream import AckPolicy, FastStream, Logger
 from faststream.rabbit import Channel, RabbitBroker, RabbitMessage
 
@@ -19,9 +20,9 @@ from src.pipeline.topology import get_dlq_queue, get_tasks_queue
 from src.services.tasks import PgTaskRepository, TaskRepository
 from src.worker.inference import InferenceEngine
 
-_settings = get_settings()
+settings = get_settings()
 
-logging_config.setup_logging(_settings.log_level, service_name="worker")
+logging_config.setup_logging(settings.log_level, service_name="worker")
 log = structlog.get_logger(__name__)
 
 # Свой логгер вместо автогенерируемого FastStream: иначе брокер ставит
@@ -29,15 +30,15 @@ log = structlog.get_logger(__name__)
 _fs_logger = logging.getLogger("faststream")
 
 broker = RabbitBroker(
-    _settings.rabbit_url,
-    graceful_timeout=_settings.worker_shutdown_timeout_s,
+    settings.rabbit_url,
+    graceful_timeout=settings.worker_shutdown_timeout_s,
     logger=_fs_logger,
 )
 engine = InferenceEngine(
-    tracking_uri=_settings.mlflow_tracking_uri,
-    model_uri=_settings.model_uri,
-    concurrency=_settings.inference_concurrency,
-    delay_s=_settings.inference_delay_s,
+    tracking_uri=settings.mlflow_tracking_uri,
+    model_uri=settings.model_uri,
+    concurrency=settings.inference_concurrency,
+    delay_s=settings.inference_delay_s,
 )
 
 _repo: TaskRepository | None = None
@@ -54,33 +55,33 @@ def _get_repo() -> TaskRepository:
 async def lifespan() -> AsyncIterator[None]:
     """Инициализация пула БД, загрузка модели и graceful shutdown."""
     global _repo
-    if _settings.prefetch_count < _settings.inference_concurrency:
+    if settings.prefetch_count < settings.inference_concurrency:
         log.warning(
             "worker_prefetch_mismatch",
-            prefetch_count=_settings.prefetch_count,
-            inference_concurrency=_settings.inference_concurrency,
+            prefetch_count=settings.prefetch_count,
+            inference_concurrency=settings.inference_concurrency,
             message="prefetch_count меньше конкурентности inference: воркер будет простаивать",
         )
-    pool = await db.create_db_pool(_settings)
+    pool = await db.create_db_pool(settings)
     try:
         await db.ensure_schema(pool)
         _repo = PgTaskRepository(pool)
-        log.info("model_loading_started", model_uri=_settings.model_uri)
+        log.info("model_loading_started", model_uri=settings.model_uri)
         await engine.load()
         log.info(
             "model_loaded",
-            model_uri=_settings.model_uri,
-            model_alias="champion",
+            model_uri=settings.model_uri,
+            **engine.model_info,
         )
         yield
     finally:
         log.info(
             "graceful_shutdown_started",
             inflight_tasks=len(_inflight),
-            timeout_s=_settings.worker_shutdown_timeout_s,
+            timeout_s=settings.worker_shutdown_timeout_s,
         )
         if _inflight:
-            _, pending = await asyncio.wait(_inflight, timeout=_settings.worker_shutdown_timeout_s)
+            _, pending = await asyncio.wait(_inflight, timeout=settings.worker_shutdown_timeout_s)
             if pending:
                 log.warning("graceful_shutdown_timeout", pending_tasks=len(pending))
         engine.shutdown()
@@ -113,14 +114,13 @@ async def _handle_failure(msg: TaskMessage, message: RabbitMessage, exc: Excepti
     current_attempt = int(headers.get("x-delivery-count", 0)) + 1
     log.error(
         "task_processing_failed",
-        task_id=msg.task_id,
         attempt=current_attempt,
-        max_attempts=_settings.worker_max_attempts,
+        max_attempts=settings.worker_max_attempts,
         error=str(exc),
-        exc_info=True,
+        exc_info=exc,
     )
-    if current_attempt < _settings.worker_max_attempts:
-        await asyncio.sleep(_settings.worker_retry_delay_s)
+    if current_attempt < settings.worker_max_attempts:
+        await asyncio.sleep(settings.worker_retry_delay_s)
         await message.reject(requeue=True)
     else:
         log.error(
@@ -148,7 +148,7 @@ async def _process(msg: TaskMessage, message: RabbitMessage) -> None:
             image_path = (
                 str(Path(msg.image_path))
                 if Path(msg.image_path).is_absolute()
-                else str(Path(_settings.data_dir) / msg.image_path)
+                else str(Path(settings.data_dir) / msg.image_path)
             )
             started = time.perf_counter()
             detections = await engine.predict(image_path)
@@ -170,7 +170,7 @@ async def _process(msg: TaskMessage, message: RabbitMessage) -> None:
 
 @broker.subscriber(
     get_tasks_queue(),
-    channel=Channel(prefetch_count=_settings.prefetch_count),
+    channel=Channel(prefetch_count=settings.prefetch_count),
     ack_policy=AckPolicy.MANUAL,
 )
 async def handle_task(msg: TaskMessage, message: RabbitMessage, logger: Logger) -> None:

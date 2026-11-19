@@ -5,20 +5,20 @@
 """
 
 import asyncio
-import structlog
 import uuid
 from pathlib import Path, PurePath
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src import logging_config
 from src.config import Settings
 from src.pipeline.client import TaskPublisher
 from src.pipeline.messages import TaskMessage
 from src.pipeline.publisher import BrokerUnavailableError, QueueFullError
-from src import logging_config
 from src.services.tasks import Task, TaskRepository, TaskStatus
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
@@ -87,7 +87,7 @@ async def _submit(
     Порядок «publish → insert» гарантирует, что после 503 в БД нет ни одной строки
     (критерий 4.2): нечего откатывать.
     """
-# кладём task_id в контекст
+    # кладём task_id в контекст
     token = logging_config.TASK_ID.set(task_id)
     try:
         try:

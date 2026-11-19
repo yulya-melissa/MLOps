@@ -1,7 +1,6 @@
 """Запуск источника: `python -m src.source`."""
-import asyncio
 
-import structlog
+import asyncio
 
 from src import logging_config
 from src.config import get_settings

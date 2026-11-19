@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
 
     # Параметры подключениѝ к Postgres — ѝобираем URL из чаѝтей.
     postgres_user: str = "postgres"
-    postgres_password: str = "postgres_password"
+    postgres_password: SecretStr = SecretStr("postgres_password")
     postgres_host: str = "localhost"
     postgres_port: int = 5433
     postgres_db: str = "fire_detection"
@@ -69,9 +70,9 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Собрать DSN длѝ asyncpg из отдельных полей."""
+        """Собрать DSN для asyncpg из отдельных полей."""
         return (
-            f"postgresql://{self.postgres_user}:{self.postgres_password}"
+            f"postgresql://{self.postgres_user}:{self.postgres_password.get_secret_value()}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
 

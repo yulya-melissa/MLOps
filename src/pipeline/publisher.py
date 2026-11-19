@@ -1,4 +1,5 @@
 """Публикация задач: одна попытка, сигнал перегрузки — исключение."""
+
 from aio_pika.exceptions import AMQPError, DeliveryError
 from faststream.rabbit import RabbitBroker
 

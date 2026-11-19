@@ -4,7 +4,7 @@
 Брокер и модель замоканы, репозиторий — `InMemoryTaskRepository`.
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from faststream.rabbit import TestRabbitBroker
@@ -42,7 +42,7 @@ def predict(monkeypatch) -> AsyncMock:
 async def test_success_marks_done_and_acks(repo, predict):
     message = make_message()
 
-    await worker._process(MSG, message, MagicMock())
+    await worker._process(MSG, message)
 
     task = await repo.get_task(MSG.task_id)
     assert task is not None
@@ -55,11 +55,11 @@ async def test_success_marks_done_and_acks(repo, predict):
 
 async def test_redelivery_of_done_task_is_idempotent(repo, predict):
     """Повторная доставка уже DONE задачи: инференса нет, строка одна, сообщение ack'нуто."""
-    await worker._process(MSG, make_message(), MagicMock())
+    await worker._process(MSG, make_message())
     assert predict.await_count == 1
 
     second = make_message()
-    await worker._process(MSG, second, MagicMock())
+    await worker._process(MSG, second)
 
     assert predict.await_count == 1  # лишней работы нет
     second.ack.assert_awaited_once()
@@ -74,7 +74,7 @@ async def test_first_failure_requeues_with_reject(repo, predict):
     predict.side_effect = RuntimeError("boom")
     message = make_message(headers={})  # первая доставка: заголовка x-delivery-count нет
 
-    await worker._process(MSG, message, MagicMock())
+    await worker._process(MSG, message)
 
     message.reject.assert_awaited_once_with(requeue=True)
     message.ack.assert_not_awaited()
@@ -88,7 +88,7 @@ async def test_last_attempt_goes_to_dlq(repo, predict):
     last = worker.settings.worker_max_attempts - 1  # x-delivery-count на последней попытке
     message = make_message(headers={"x-delivery-count": last})
 
-    await worker._process(MSG, message, MagicMock())
+    await worker._process(MSG, message)
 
     message.reject.assert_awaited_once_with(requeue=False)  # брокер уведёт в DLQ
     message.ack.assert_not_awaited()
@@ -110,7 +110,7 @@ async def test_result_written_before_ack(repo, predict):
 
     message.ack.side_effect = check_status_on_ack
 
-    await worker._process(MSG, message, MagicMock())
+    await worker._process(MSG, message)
 
     assert seen["status"] is TaskStatus.DONE
 

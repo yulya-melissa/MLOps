@@ -15,7 +15,6 @@ import contextvars
 import logging
 import re
 import sys
-from typing import Any
 
 import structlog
 
@@ -63,10 +62,10 @@ _LIBRARY_LOGGERS: tuple[str, ...] = (
 
 # --- Собственные процессоры --------------------------------------------------
 def _mask_secrets(
-    _logger: Any,
+    _logger: structlog.types.WrappedLogger,
     _method: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
     """Затереть значения полей, чьи имена похожи на секреты."""
     for key in list(event_dict):
         if any(hint in key.lower() for hint in _SECRET_HINTS):
@@ -75,10 +74,10 @@ def _mask_secrets(
 
 
 def _mask_url_credentials(
-    _logger: Any,
+    _logger: structlog.types.WrappedLogger,
     _method: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
     """Затереть пароль внутри строковых значений (DSN, AMQP URL, traceback)."""
     for key, value in event_dict.items():
         if isinstance(value, str):
@@ -87,10 +86,10 @@ def _mask_url_credentials(
 
 
 def _merge_context(
-    _logger: Any,
+    _logger: structlog.types.WrappedLogger,
     _method: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
     """Подмешать в запись значения наших contextvars: request_id и task_id.
 
     `structlog.contextvars.merge_contextvars` видит только переменные,
