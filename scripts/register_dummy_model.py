@@ -13,6 +13,7 @@
 Контракт модели: возвращаем `pandas.DataFrame`, потому что
 `src/worker/inference.py` вызывает `df.to_dict("records")`.
 """
+
 import os
 import sys
 import tempfile
@@ -102,9 +103,7 @@ def main() -> None:
 
             # Шаг 5: назначаем псевдоним 'champion'.
             print(f"-> Назначаем alias 'champion' для версии {mv.version}...")
-            client.set_registered_model_alias(
-                name=model_name, alias="champion", version=mv.version
-            )
+            client.set_registered_model_alias(name=model_name, alias="champion", version=mv.version)
             print(f"Готово! Alias 'champion' указывает на версию {mv.version}.")
 
 
