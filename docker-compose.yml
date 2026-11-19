@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
 
   create-bucket:
-    image: amazon/aws-cli:latest
+    image: amazon/aws-cli:2.41.1
     container_name: mlflow_create_bucket
     depends_on:
       rustfs:

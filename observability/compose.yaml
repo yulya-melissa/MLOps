@@ -1,7 +1,3 @@
-# Стек наблюдаемости. Подключается из корневого docker-compose.yml через include.
-# Все сервисы под профилями: обычный `docker compose up` их не поднимает.
-# ВАЖНО: относительные пути считаются от ЭТОГО файла, а не от корня репозитория.
-
 services:
   loki:
     image: grafana/loki:${LOKI_VERSION:-3.7.0}
@@ -12,11 +8,9 @@ services:
       - ./loki/config.yaml:/etc/loki/config.yaml:ro
       - loki_data:/loki
     ports:
-      - "3100:3100" # HTTP API для LogQL-запросов с хоста
+      - "3100:3100"
     mem_limit: 512m
     healthcheck:
-      # В образах Loki 3.6+ убрали busybox: wget больше не работает.
-      # Нативная проверка loki -health доступна с 3.6.5.
       test: [ "CMD", "/usr/bin/loki", "-health" ]
       interval: 15s
       timeout: 5s
@@ -35,19 +29,23 @@ services:
       - --storage.path=/var/lib/alloy/data
     volumes:
       - ./log-agent/config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro # только чтение
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - alloy_data:/var/lib/alloy/data
     environment:
       LOKI_URL: http://loki:3100/loki/api/v1/push
       COMPOSE_PROJECT: ${COMPOSE_PROJECT:-mlops}
       LOG_ENV: ${LOG_ENV:-production}
     ports:
-      - "12345:12345" # UI агента: граф компонентов и их состояние
+      - "12345:12345"
+    healthcheck:
+      test: [ "CMD-SHELL", "pidof alloy > /dev/null || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     mem_limit: 256m
     depends_on:
       loki:
-        # service_started, а не service_healthy: агент обязан переживать
-        # недоступность хранилища (буфер + повторы), а не блокироваться.
         condition: service_started
     restart: unless-stopped
 
