@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import structlog
 import random
 import time
 from collections.abc import Iterator
@@ -14,6 +15,7 @@ from faststream.rabbit import RabbitBroker
 
 from src.config import Settings, get_settings
 from src.pipeline.messages import TaskMessage
+from src import logging_config
 from src.pipeline.publisher import QueueFullError, publish_task
 from src.pipeline.topology import get_tasks_queue
 
@@ -65,17 +67,31 @@ async def publish_with_backoff(
     `source_backoff_max_s` — её нужно держать заметно меньше времени inference,
     иначе очередь успеет опустеть, пока источник спит.
     """
-    delay = settings.source_backoff_min_s
-    while True:
-        try:
-            await publish_task(broker, msg)
-        except QueueFullError:
-            stats.rejected += 1
-            await asyncio.sleep(delay * (1 + random.random()))
-            delay = min(delay * 2, settings.source_backoff_max_s)
-        else:
-            stats.published += 1
-            return
+    token = logging_config.TASK_ID.set(msg.task_id)
+    try:
+        delay = settings.source_backoff_min_s
+        while True:
+            try:
+                await publish_task(broker, msg)
+            except QueueFullError:
+                stats.rejected += 1
+                log.debug(
+                    "source_queue_full_retry",
+                    task_id=msg.task_id,
+                    delay_s=round(delay, 3),
+                )
+                await asyncio.sleep(delay * (1 + random.random()))
+                delay = min(delay * 2, settings.source_backoff_max_s)
+            else:
+                stats.published += 1
+                log.debug(
+                    "source_published",
+                    task_id=msg.task_id,
+                )
+                return
+    finally:
+        # сбрасываем contextvar
+        logging_config.TASK_ID.reset(token)
 
 
 async def report(stats: Stats, interval_s: float) -> None:

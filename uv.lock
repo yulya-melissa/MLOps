@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -818,6 +818,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "faststream", extra = ["rabbit"] },
     { name = "pydantic-settings" },
+    { name = "structlog" },
     { name = "testcontainers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -884,6 +885,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'inference'", specifier = ">=2.3.3" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "python-multipart", marker = "extra == 'inference'", specifier = ">=0.0.20" },
+    { name = "structlog", specifier = ">=24.4.0" },
     { name = "testcontainers", specifier = ">=4.15.0" },
     { name = "torch", marker = "extra == 'inference'", specifier = ">=2.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", marker = "extra == 'inference'", specifier = ">=0.19", index = "https://download.pytorch.org/whl/cpu" },
@@ -2934,6 +2936,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/cf/09/f189fd3c70544322eeba0398ccaa980d17857894c0a66d447aa0b5704686/strawberry_graphql-0.316.0.tar.gz", hash = "sha256:bee5ce0e20d522325bd1ed2db186c812c03c2ea7db29f997b35e7d694649820c", size = 223985, upload-time = "2026-05-19T17:06:10.443Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/dd/b2cf54803cbd0d37e3ce73c7274bdb144ba83743bc83351b5790eb2a5fad/strawberry_graphql-0.316.0-py3-none-any.whl", hash = "sha256:222e16fbbf953f5a1fa75f62bf9a8e95f274180f928f70bec459b566053aa2cb", size = 326530, upload-time = "2026-05-19T17:06:07.844Z" },
+]
+
+[[package]]
+name = "structlog"
+version = "26.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/89/b4a0bcfdf4f71a3dea31379f095929613d7e4528a0996bca6aa964cd0dca/structlog-26.1.0.tar.gz", hash = "sha256:f63a716cbd1b1291cf7661de7794b455acfa4c43c5bcf1630e6ad5ddc1adb3b7", size = 1459881, upload-time = "2026-06-06T07:33:39.348Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/18/489c97b834dfff9cf2fc2507cede4bcd4b11e67f84bc462acd1992496f86/structlog-26.1.0-py3-none-any.whl", hash = "sha256:e081a26d6c373e6d201eca24eede26d8ffab07f88f477822e679183428d3d91e", size = 73764, upload-time = "2026-06-06T07:33:38.046Z" },
 ]
 
 [[package]]

@@ -5,7 +5,7 @@
 """
 
 import asyncio
-import logging
+import structlog
 import uuid
 from pathlib import Path, PurePath
 from typing import Annotated
@@ -18,10 +18,11 @@ from src.config import Settings
 from src.pipeline.client import TaskPublisher
 from src.pipeline.messages import TaskMessage
 from src.pipeline.publisher import BrokerUnavailableError, QueueFullError
+from src import logging_config
 from src.services.tasks import Task, TaskRepository, TaskStatus
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg": ".jpg",
@@ -86,31 +87,42 @@ async def _submit(
     Порядок «publish → insert» гарантирует, что после 503 в БД нет ни одной строки
     (критерий 4.2): нечего откатывать.
     """
+# кладём task_id в контекст
+    token = logging_config.TASK_ID.set(task_id)
     try:
-        await publisher.publish(TaskMessage(task_id=task_id, image_path=image_path))
-    except (QueueFullError, BrokerUnavailableError) as exc:
-        if uploaded_file is not None:
-            await asyncio.to_thread(uploaded_file.unlink, missing_ok=True)
-        log.warning("Задача %s отклонена (503): %s", task_id, exc)
-        retry_after = settings.api_retry_after_s
-        return JSONResponse(
-            status_code=503,
-            headers={"Retry-After": str(retry_after)},
-            content={
-                "detail": f"Сервис перегружен. Повторите запрос через {retry_after} с.",
-                "retry_after": retry_after,
-                "task_id": task_id,
-            },
-        )
+        try:
+            await publisher.publish(TaskMessage(task_id=task_id, image_path=image_path))
+        except (QueueFullError, BrokerUnavailableError) as exc:
+            if uploaded_file is not None:
+                await asyncio.to_thread(uploaded_file.unlink, missing_ok=True)
+            log.warning(
+                "task_rejected_503",
+                task_id=task_id,
+                reason=str(exc),
+                retry_after_s=settings.api_retry_after_s,
+            )
+            retry_after = settings.api_retry_after_s
+            return JSONResponse(
+                status_code=503,
+                headers={"Retry-After": str(retry_after)},
+                content={
+                    "detail": f"Сервис перегружен. Повторите запрос через {retry_after} с.",
+                    "retry_after": retry_after,
+                    "task_id": task_id,
+                },
+            )
 
-    try:
-        await repo.create_task(task_id, image_path)
-    except Exception:
-        # Задача уже в очереди, а воркер создаёт строку сам (upsert),
-        # поэтому клиенту честно отвечаем 202.
-        log.exception("Не удалось создать запись о задаче %s", task_id)
-
-    return TaskAccepted(task_id=task_id, poll_url=f"{router.prefix}/{task_id}")
+        try:
+            await repo.create_task(task_id, image_path)
+        except Exception:
+            log.error(
+                "task_db_insert_failed",
+                task_id=task_id,
+                exc_info=True,
+            )
+        return TaskAccepted(task_id=task_id, poll_url=f"{router.prefix}/{task_id}")
+    finally:
+        logging_config.TASK_ID.reset(token)
 
 
 @router.post(

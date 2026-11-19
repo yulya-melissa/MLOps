@@ -1,13 +1,12 @@
 """Точка сборки приложения FastAPI."""
-
 import asyncio
-import logging
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import structlog
 from fastapi import FastAPI, Request
 from starlette.responses import Response
 
@@ -16,17 +15,18 @@ from src.api import health, tasks, ui, version
 from src.pipeline.client import TaskPublisher
 from src.services.tasks import PgTaskRepository
 
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialize resources on startup and release them on shutdown."""
     settings = config.get_settings()
-    logging_config.setup_logging(settings.log_level)
-    app.state.settings = settings
+    logging_config.setup_logging(settings.log_level, service_name="api")
+    # Привязываем service_name ко всем логам этого процесса
+    structlog.contextvars.bind_contextvars(service="api")
 
-    # Модель живёт только в воркере: API лишь принимает задачи и отдаёт статусы.
+    app.state.settings = settings
     app.state.db_pool = await db.create_db_pool(settings)
     app.state.task_repo = PgTaskRepository(app.state.db_pool)
     app.state.publisher = TaskPublisher(settings)
@@ -35,22 +35,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
             await db.ensure_schema(app.state.db_pool)
         except Exception:
-            # API должен подняться и при недоступной БД: /healthz покажет проблему.
-            log.warning("Не удалось проверить схему БД", exc_info=True)
+            log.warning("db_schema_check_failed", exc_info=True)
 
         await asyncio.to_thread(Path(settings.upload_dir).mkdir, parents=True, exist_ok=True)
 
         log.info(
-            "Service %s version %s started successfully!",
-            settings.app_name,
-            settings.version,
+            "service_started",
+            service=settings.app_name,
+            version=settings.version,
+            environment=settings.environment,
         )
-
         yield
     finally:
         await app.state.publisher.close()
         await db.close_db_pool(app.state.db_pool)
-        log.info("Application stopped")
+        log.info("service_stopped")
 
 
 def create_app() -> FastAPI:
@@ -67,20 +66,27 @@ def create_app() -> FastAPI:
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        """Поставить request_id в контекст и залогировать запрос."""
+        """Поставить request_id в контекст и залогировать запрос.
+
+        Health-check `/healthz` не логируем на INFO — он дёргается каждые 5 секунд
+        и засоряет лог.
+        """
+        is_health = request.url.path == "/healthz"
+
         request_id = uuid.uuid4().hex[:8]
         token = logging_config.REQUEST_ID.set(request_id)
         start = time.perf_counter()
         try:
             response = await call_next(request)
             elapsed_ms = (time.perf_counter() - start) * 1000
-            log.info(
-                "%s %s -> %d (%.1f ms)",
-                request.method,
-                request.url.path,
-                response.status_code,
-                elapsed_ms,
-            )
+            if not is_health:
+                log.info(
+                    "http_request",
+                    method=request.method,
+                    path=request.url.path,
+                    status=response.status_code,
+                    elapsed_ms=round(elapsed_ms, 1),
+                )
         finally:
             logging_config.REQUEST_ID.reset(token)
 

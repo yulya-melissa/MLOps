@@ -1,18 +1,19 @@
 """Запуск источника: `python -m src.source`."""
-
 import asyncio
-import logging
 
+import structlog
+
+from src import logging_config
 from src.config import get_settings
 from src.source.producer import run
 
 
 def main() -> None:
     """Настроить логирование и запустить источник."""
-    logging.basicConfig(
-        level=get_settings().log_level.upper(),
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    )
+    settings = get_settings()
+    logging_config.setup_logging(settings.log_level, service_name="source")
+    structlog.contextvars.bind_contextvars(service="source")
+
     asyncio.run(run())
 
 
