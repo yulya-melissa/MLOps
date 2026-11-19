@@ -1,7 +1,7 @@
 """Inference модели из MLflow: загрузка один раз, predict в пуле потоков."""
 
 import asyncio
-import logging
+import structlog
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from mlflow.pyfunc import PyFuncModel
 
-log = logging.getLogger(__name__)
+log = structlog.get_logger(__name__)
 
 
 class InferenceEngine:
@@ -49,7 +49,12 @@ class InferenceEngine:
         mlflow.set_tracking_uri(self._tracking_uri)
         started = time.perf_counter()
         model = mlflow.pyfunc.load_model(self._model_uri)
-        log.info("Модель %s загружена за %.1f c", self._model_uri, time.perf_counter() - started)
+        elapsed_s = time.perf_counter() - started
+        log.info(
+            "model_loaded_sync",
+            model_uri=self._model_uri,
+            elapsed_s=round(elapsed_s, 2),
+        )
         return model
 
     async def predict(self, image_path: str) -> list[dict[str, object]]:

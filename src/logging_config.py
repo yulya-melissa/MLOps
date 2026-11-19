@@ -1,5 +1,4 @@
 """Настройка структурированного логирования через structlog.
-
 Все сервисы (api / worker / source) вызывают `setup_logging(level, service_name=...)`
 в начале своей работы. Логи уходят в stdout в JSON-формате, приложение не знает
 о существовании агента и хранилища.
@@ -22,7 +21,7 @@ import structlog
 # ---------------------------------------------------------------------------
 # request_id — для HTTP-запросов в API (уже используется в app.py middleware)
 # task_id — для задач конвейера; воркер выставляет его при получении сообщения,
-#           источник/API — при создании задачи.
+# источник/API — при создании задачи.
 REQUEST_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "request_id",
     default=None,
@@ -66,6 +65,30 @@ def _mask_secrets(
     return event_dict
 
 
+def _merge_context(
+    _logger: Any,
+    _method: str,
+    event_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """Подмешать в запись значения наших contextvars: request_id и task_id.
+
+    `structlog.contextvars.merge_contextvars` видит только переменные,
+    установленные через `structlog.contextvars.bind_contextvars()`.
+    REQUEST_ID и TASK_ID — обычные contextvars.ContextVar, поэтому
+    читаем их сами. Значение берётся в момент вызова log.*, а не в момент
+    создания логгера, — поэтому cache_logger_on_first_use не мешает.
+    """
+    request_id = REQUEST_ID.get()
+    if request_id is not None:
+        event_dict.setdefault("request_id", request_id)
+
+    task_id = TASK_ID.get()
+    if task_id is not None:
+        event_dict.setdefault("task_id", task_id)
+
+    return event_dict
+
+
 # ---------------------------------------------------------------------------
 # Публичный API
 # ---------------------------------------------------------------------------
@@ -82,6 +105,7 @@ def setup_logging(level: str, *, service_name: str) -> None:
     # --- 1. Процессоры, общие для structlog и стандартного logging ----------
     shared_processors: list[structlog.types.Processor] = [
         structlog.contextvars.merge_contextvars,   # request_id, task_id из контекста
+        _merge_context,
         structlog.stdlib.add_log_level,            # поле `level`
         structlog.stdlib.add_logger_name,          # поле `logger`
         structlog.processors.TimeStamper(fmt="iso"),  # поле `timestamp` в ISO-8601
@@ -89,6 +113,8 @@ def setup_logging(level: str, *, service_name: str) -> None:
         structlog.processors.UnicodeDecoder(),
         structlog.processors.format_exc_info,      # traceback в поле `exception`
         _mask_secrets,                             # затирание секретов
+        # Добавляем service_name в каждую запись
+        lambda _logger, _method, event_dict: event_dict | {"service": service_name},
     ]
 
     # --- 2. Конфигурация structlog ------------------------------------------

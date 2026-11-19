@@ -12,8 +12,6 @@ def main() -> None:
     """Настроить логирование и запустить источник."""
     settings = get_settings()
     logging_config.setup_logging(settings.log_level, service_name="source")
-    structlog.contextvars.bind_contextvars(service="source")
-
     asyncio.run(run())
 
 

@@ -17,21 +17,18 @@ class BrokerUnavailableError(Exception):
 async def publish_task(broker: RabbitBroker, msg: TaskMessage) -> None:
     """Опубликовать задачу и дождаться publisher confirm.
 
-    `correlation_id` устанавливается равным `task_id`, чтобы воркер мог
-    автоматически извлечь его и положить в contextvar (см. worker/app.py).
-    Это требование задания 1.2: task_id передаётся через брокер.
-
-    `QueueFullError` — сигнал перегрузки, `BrokerUnavailable` — брокер недоступен.
-    Что с ними делать, решает вызывающий: источник ждёт и повторяет, API вернёт 503.
+    `correlation_id` — это стандартное поле AMQP, которое RabbitMQ передаёт
+    без модификаций. Воркер извлекает его и кладёт в contextvars, поэтому
+    task_id автоматически попадает во все логи обработчика.
     """
     try:
         await broker.publish(
             msg,
             queue=get_tasks_queue(),
             persist=True,
-            correlation_id=msg.task_id,  # <-- ДОБАВЛЕНО: передача task_id через брокер
+            correlation_id=msg.task_id,
         )
-    except DeliveryError as exc:  # подкласс AMQPError, поэтому стоит первым
+    except DeliveryError as exc:
         raise QueueFullError("очередь задач заполнена") from exc
     except (AMQPError, OSError) as exc:
         raise BrokerUnavailableError("RabbitMQ недоступен") from exc

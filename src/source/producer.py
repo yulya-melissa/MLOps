@@ -1,7 +1,6 @@
 """Пакетный источник задач с обратной связью от брокера."""
 
 import asyncio
-import logging
 import structlog
 import random
 import time
@@ -13,13 +12,15 @@ from uuid import uuid4
 
 from faststream.rabbit import RabbitBroker
 
+from src import logging_config
 from src.config import Settings, get_settings
 from src.pipeline.messages import TaskMessage
 from src import logging_config
 from src.pipeline.publisher import QueueFullError, publish_task
 from src.pipeline.topology import get_tasks_queue
 
-log = logging.getLogger(__name__)
+logging_config.setup_logging(get_settings().log_level, service_name="source")
+log = structlog.get_logger(__name__)
 
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp"}
 
