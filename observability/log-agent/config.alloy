@@ -1,0 +1,61 @@
+// Логи контейнеров нашего compose-проекта -> Loki.
+// Приложение об этом не знает: оно просто пишет JSON в stdout.
+
+// 1. Поиск контейнеров через Docker API (сокет смонтирован read-only).
+discovery.docker "project" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "10s"   // второй воркер должен подхватиться быстро
+
+  // Фильтр на стороне Docker: чужие проекты не попадают даже в список целей.
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+  }
+}
+
+// 2. Оставляем сервисы конвейера и вешаем лейбл service.
+discovery.relabel "pipeline" {
+  targets = discovery.docker.project.targets
+
+  // postgres/rabbitmq/mlflow пишут не-JSON — их логи оставляем в docker logs.
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "app|worker|source"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+// 3. Чтение stdout/stderr контейнеров.
+loki.source.docker "pipeline" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.pipeline.output
+  forward_to = [loki.process.pipeline.receiver]
+
+  // env — статический лейбл низкой кардинальности.
+  labels = { env = sys.env("LOG_ENV") }
+}
+
+// 4. Из JSON берём ТОЛЬКО level. task_id и trace_id остаются полями строки.
+loki.process "pipeline" {
+  forward_to = [loki.write.loki.receiver]
+
+  stage.json {
+    expressions = { level = "level" }
+  }
+
+  stage.labels {
+    values = { level = "level" }
+  }
+}
+
+// 5. Отправка в Loki.
+loki.write "loki" {
+  endpoint {
+    url = sys.env("LOKI_URL")
+  }
+}

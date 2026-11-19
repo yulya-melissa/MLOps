@@ -1,3 +1,6 @@
+include:
+  - path: observability/compose.yaml
+
 x-pipeline-env: &pipeline-env
   FIRE_LOG_LEVEL: ${FIRE_LOG_LEVEL:-INFO}
   FIRE_RABBIT_URL: amqp://fire:fire_password@rabbitmq:5672/
