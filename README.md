@@ -180,6 +180,63 @@ observability/
 * `docker.sock` смонтирован **только на чтение**. Это ограничение файловой операции,
   а не прав Docker API: в продакшене агент ходит к сокету через socket-proxy.
 
+### Бюджет памяти (под нагрузкой)
+
+Замер снимался при работающем источнике (`docker compose --profile load up -d source`)
+и включённом профиле наблюдаемости (`docker compose --profile logs up -d`).
+Общая память Docker VM на стенде: **3,73 ГиБ**.
+
+#### Стек наблюдаемости (профиль `logs`)
+
+| Сервис | Образ | Лимит | Факт под нагрузкой | % от лимита |
+|---|---|---|---|---|
+| Loki | `grafana/loki:3.7.0` | 512 MiB | **107 MiB** | 21% |
+| Alloy | `grafana/alloy:v1.21.3` | 256 MiB | **133 MiB** | 52% |
+| **Итого `logs`** | | **768 MiB** | **≈240 MiB** | — |
+
+Ориентир задания на полный профиль `observability` (с Grafana, Tempo, Prometheus) —
+около 1,5 ГБ. Наш стек наблюдаемости занимает 240 MiB, оставляя ~1,25 ГБ на оставшиеся
+сервисы наблюдаемости, которые подключит сокомандница.
+
+#### Конвейер (для справки)
+
+| Сервис | Факт под нагрузкой |
+|---|---|
+| fire_detection_app (API) | 70 MiB |
+| mlops-worker-1 | 209 MiB |
+| fire_detection_postgres | 34 MiB |
+| fire_rabbitmq | 104 MiB |
+| mlflow_server | 600 MiB |
+| mlflow_postgres | 39 MiB |
+| mlflow_rustfs | 92 MiB |
+| **Итого конвейер** | **≈1,15 GiB** |
+
+**Суммарно под нагрузкой** (конвейер + профиль `logs`): **≈1,39 GiB из 3,73 GiB**
+(≈37% памяти VM). Запас достаточен для добавления Grafana и OTel Collector.
+
+### Retention
+
+| Хранилище | Retention | Механизм |
+|---|---|---|
+| Loki | **72 часа** | `limits_config.retention_period` + `compactor.retention_enabled` |
+| Alloy (WAL) | 24 часа | буфер при недоступности Loki; персистентный в томе `alloy_data` |
+
+### Healthchecks
+
+| Сервис | Проверка | Статус |
+|---|---|---|
+| Loki | `/usr/bin/loki -health` | ✓ native, без busybox |
+| Alloy | `wget http://127.0.0.1:12345/-/healthy` | ✓ HTTP, endpoint `/-/healthy` |
+
+### Именованные тома и закрепление версий
+
+- **Данные** — в именованных томах `loki_data`, `alloy_data` (переживают `docker compose down`).
+- **Теги образов** закреплены в `.env.example`:
+  - `grafana/loki:3.7.0`
+  - `grafana/alloy:v1.21.3`
+  - `amazon/aws-cli:2.41.1`
+  - Тег `latest` **не используется** нигде в стеке.
+
 ## 4. Как найти историю задачи
 
 LogQL (в Grafana — Explore, без Grafana — HTTP API Loki):
@@ -222,3 +279,82 @@ foreach ($s in $r.data.result) { $s.stream.service; foreach ($v in $s.values) { 
 * Реплики воркера в логах неразличимы по лейблу (`service=worker` у обеих);
   различение появится с `service.instance.id` в трейсинге.
 * Retention 72 часа — стенд, не продакшен.
+
+## Демонстрация независимости приложения от наблюдаемости
+
+Это ключевой критерий раздела 5: стек наблюдаемости можно отключить,
+и конвейер продолжит работать.
+
+```bash
+# Поднять приложение
+docker compose up -d
+
+# Поднять наблюдаемость
+docker compose --profile logs up -d
+
+# Отправить задачу и убедиться, что она обработалась
+curl.exe -X POST http://localhost:8000/api/v1/tasks/by-path \
+  -H "Content-Type: application/json" \
+  -d '{"image_path":"images/test.jpg"}'
+
+# Остановить стек наблюдаемости — конвейер продолжает работать
+docker compose --profile logs stop alloy loki
+
+curl.exe -X POST http://localhost:8000/api/v1/tasks/by-path \
+  -H "Content-Type: application/json" \
+  -d '{"image_path":"images/test.jpg"}'
+# → 202 Accepted, task_id возвращается, воркер обрабатывает
+
+# Логи в это время копируются в stdout контейнеров (docker logs mlops-worker-1)
+# и ждут Alloy: после повторного старта агент дочитает их с момента останова.
+docker compose --profile logs start alloy loki
+
+
+
+
+---
+
+## 🎯 Что дальше: следующие разделы задания
+
+Согласно ТЗ, осталось выполнить три раздела:
+
+### Раздел 2: Распределенная трассировка (3 балла)
+**Что нужно сделать:**
+1. Инструментировать код OpenTelemetry SDK
+2. Настроить OTel Collector (профиль `traces`)
+3. Выбрать хранилище трейсов (Tempo/Jaeger/VictoriaTraces)
+4. Создать сквозные трейсы: `API → RabbitMQ → Worker → MLflow → БД`
+5. Добавить ручные спаны для inference и записи в БД
+
+**Ключевые критерии:**
+- Один `trace_id` проходит через все сервисы
+- Контекст передается через RabbitMQ (заголовок `traceparent`)
+- Inference выполняется в пуле потоков, контекст передается явно
+- Ошибки видны в трейсах (статус ERROR, исключения)
+
+### Раздел 3: Метрики (1.5 балла)
+**Что нужно сделать:**
+1. Экспортировать метрики API, worker, source
+2. Настроить сбор метрик RabbitMQ (порт 15692)
+3. Выбрать хранилище (Prometheus/VictoriaMetrics)
+4. Обосновать pull vs push модель
+
+**Ключевые метрики:**
+- API: количество запросов, latency (гистограмма), коды ответов (включая 503)
+- Worker: обработано задач (ok/error/dlq), latency inference, задач в работе (gauge)
+- Source: опубликовано задач, отказов брокера
+- RabbitMQ: глубина очередей (рабочей и DLQ), unacked messages
+
+### Раздел 4: Grafana (2.5 балла)
+**Что нужно сделать:**
+1. Настроить Grafana через provisioning (YAML + JSON)
+2. Создать дашборд "Конвейер":
+   - Глубина очереди с линией лимита
+   - Скорость источника vs пропускная способность воркеров
+   - Перцентили latency (p50, p95, p99)
+   - Память сервисов
+   - Доля 503, отказы брокера, рост DLQ
+3. Настроить корреляцию: лог → трейс → лог
+4. Создать алерты (очередь заполнена, рост DLQ)
+
+---
